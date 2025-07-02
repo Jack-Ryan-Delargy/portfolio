@@ -1388,31 +1388,81 @@ body {
     line-height: 1.7;
 }
 
-/* ===== SKILLS SECTION (UPDATED) ===== */
-.skills {
+/* ===== TECH SLIDER STYLES (Replace the old skills section styles) ===== */
+
+/* Remove or comment out the old .skills styles and replace with this */
+.tech-slider-section {
     padding: var(--spacing-xl) 0;
     background: var(--bg-primary);
+    overflow: hidden;
 }
 
-.skills-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 2rem;
-    margin-top: 3rem;
+.tech-slider-container {
+    position: relative;
+    width: 100%;
+    margin: 0 auto;
 }
 
-.skill-category {
+.tech-slider-wrapper {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    /* Fade effect on edges */
+    mask: linear-gradient(
+        to right,
+        transparent 0%,
+        black 5%,
+        black 95%,
+        transparent 100%
+    );
+    -webkit-mask: linear-gradient(
+        to right,
+        transparent 0%,
+        black 5%,
+        black 95%,
+        transparent 100%
+    );
+}
+
+.tech-slider-track {
+    display: flex;
+    gap: 3rem;
+    animation: slideInfinite 30s linear infinite;
+    width: fit-content;
+}
+
+.tech-slider-track:hover {
+    animation-play-state: paused;
+}
+
+@keyframes slideInfinite {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(-50%);
+    }
+}
+
+.tech-item {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 2rem;
     background: var(--bg-secondary);
     border-radius: var(--border-radius-xl);
-    padding: 2rem;
     box-shadow: 0 10px 30px var(--shadow-light);
     border: 1px solid var(--glass-border);
-    transition: transform var(--transition-medium);
+    transition: all var(--transition-medium);
+    cursor: pointer;
+    min-width: 180px;
     position: relative;
     overflow: hidden;
 }
 
-.skill-category::before {
+.tech-item::before {
     content: '';
     position: absolute;
     top: 0;
@@ -1420,182 +1470,252 @@ body {
     right: 0;
     height: 4px;
     background: var(--bg-accent);
+    transform: scaleX(0);
+    transition: transform var(--transition-medium);
 }
 
-.skill-category:hover {
-    transform: translateY(-5px);
+.tech-item:hover {
+    transform: translateY(-10px);
     box-shadow: 0 20px 40px var(--shadow-medium);
 }
 
-.category-header {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    margin-bottom: 2rem;
+.tech-item:hover::before {
+    transform: scaleX(1);
 }
 
-.category-icon {
-    font-size: 2.5rem;
-    padding: 0.75rem;
-    background: var(--bg-accent);
+.tech-logo {
+    width: 70px;
+    height: 70px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
     border-radius: var(--border-radius-lg);
-    color: white;
-    box-shadow: 0 4px 12px var(--shadow-light);
+    background: var(--glass-bg);
+    backdrop-filter: blur(10px);
+    transition: all var(--transition-medium);
+    position: relative;
+    overflow: hidden;
 }
 
-.category-header h3 {
-    font-size: var(--font-size-xl);
+.tech-item:hover .tech-logo {
+    transform: scale(1.1);
+    box-shadow: 0 8px 25px var(--shadow-medium);
+}
+
+.tech-logo img {
+    width: 80%;
+    height: 80%;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+/* Fallback for when images aren't available */
+.tech-logo .emoji-fallback {
+    font-size: 3rem;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.tech-name {
     font-weight: 600;
     color: var(--text-primary);
-    margin: 0;
+    text-align: center;
+    font-size: var(--font-size-base);
+    margin-bottom: 0.25rem;
 }
 
-.skill-items {
+.tech-category {
+    font-size: var(--font-size-xs);
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+
+.tech-experience {
+    font-size: var(--font-size-xs);
+    color: var(--text-accent);
+    font-weight: 500;
+    padding: 0.25rem 0.75rem;
+    background: rgba(59, 130, 246, 0.1);
+    border-radius: 1rem;
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    text-align: center;
+}
+
+/* Slider Controls */
+.slider-controls {
     display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 3rem;
 }
 
-.skill-item {
+.control-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 2px solid var(--text-accent);
+    background: var(--bg-secondary);
+    color: var(--text-accent);
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
     display: flex;
     align-items: center;
-    gap: 1rem;
+    justify-content: center;
+    backdrop-filter: blur(10px);
 }
 
-.skill-name {
-    font-weight: 600;
-    color: var(--text-primary);
-    min-width: 100px;
-    font-size: var(--font-size-sm);
+.control-btn:hover {
+    background: var(--text-accent);
+    color: white;
+    transform: scale(1.1);
 }
 
-.skill-bar {
-    flex: 1;
-    height: 10px;
-    background: var(--bg-tertiary);
-    border-radius: 5px;
-    overflow: hidden;
-    position: relative;
-    box-shadow: inset 0 2px 4px var(--shadow-light);
+.control-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
-.skill-progress {
-    height: 100%;
-    background: linear-gradient(90deg, var(--pokemon-blue), var(--text-accent));
-    border-radius: 5px;
-    width: 0%;
-    transition: width 1.5s ease 0.3s;
-    position: relative;
-    overflow: hidden;
-}
-
-.skill-progress::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
-    animation: skill-shine 2s ease infinite;
-}
-
-@keyframes skill-shine {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(100%); }
-}
-
-.skill-percent {
-    font-weight: 600;
+.control-btn:disabled:hover {
+    transform: none;
+    background: var(--bg-secondary);
     color: var(--text-accent);
-    min-width: 40px;
-    text-align: right;
-    font-family: var(--font-mono);
+}
+
+/* Speed Controls */
+.speed-controls {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: 2rem;
+}
+
+.speed-btn {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--glass-border);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border-radius: 1rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
     font-size: var(--font-size-sm);
+    font-family: inherit;
 }
 
-/* Skill category specific colors */
-.skill-category:nth-child(1) .category-icon {
-    background: linear-gradient(135deg, #61dafb, #21a9d8);
+.speed-btn.active,
+.speed-btn:hover {
+    background: var(--text-accent);
+    color: white;
+    border-color: var(--text-accent);
 }
 
-.skill-category:nth-child(2) .category-icon {
-    background: linear-gradient(135deg, #68d391, #38a169);
+/* Tech-specific colors for logos */
+.tech-item[data-tech="javascript"] .tech-logo {
+    background: linear-gradient(135deg, #F7DF1E20, #F7DF1E10);
+    border: 2px solid #F7DF1E40;
 }
 
-.skill-category:nth-child(3) .category-icon {
-    background: linear-gradient(135deg, #f6ad55, #ed8936);
+.tech-item[data-tech="react"] .tech-logo,
+.tech-item[data-tech="react native"] .tech-logo {
+    background: linear-gradient(135deg, #61DAFB20, #61DAFB10);
+    border: 2px solid #61DAFB40;
 }
 
-.skill-category:nth-child(4) .category-icon {
-    background: linear-gradient(135deg, #fc8181, #e53e3e);
+.tech-item[data-tech="node.js"] .tech-logo {
+    background: linear-gradient(135deg, #33993320, #33993310);
+    border: 2px solid #33993340;
 }
 
-.skill-category:nth-child(1) .skill-progress {
-    background: linear-gradient(90deg, #61dafb, #21a9d8);
+.tech-item[data-tech="python"] .tech-logo {
+    background: linear-gradient(135deg, #3776AB20, #3776AB10);
+    border: 2px solid #3776AB40;
 }
 
-.skill-category:nth-child(2) .skill-progress {
-    background: linear-gradient(90deg, #68d391, #38a169);
+.tech-item[data-tech="php"] .tech-logo {
+    background: linear-gradient(135deg, #777BB420, #777BB410);
+    border: 2px solid #777BB440;
 }
 
-.skill-category:nth-child(3) .skill-progress {
-    background: linear-gradient(90deg, #f6ad55, #ed8936);
+.tech-item[data-tech="html5"] .tech-logo {
+    background: linear-gradient(135deg, #E34F2620, #E34F2610);
+    border: 2px solid #E34F2640;
 }
 
-.skill-category:nth-child(4) .skill-progress {
-    background: linear-gradient(90deg, #fc8181, #e53e3e);
+.tech-item[data-tech="css3"] .tech-logo {
+    background: linear-gradient(135deg, #1572B620, #1572B610);
+    border: 2px solid #1572B640;
 }
 
-/* Animation on scroll */
-.skills.revealed .skill-progress {
-    width: var(--target-width) !important;
+.tech-item[data-tech="typescript"] .tech-logo {
+    background: linear-gradient(135deg, #3178C620, #3178C610);
+    border: 2px solid #3178C640;
 }
 
-/* Responsive Design for Skills */
+/* Responsive Design */
 @media (max-width: 768px) {
-    .skills-grid {
-        grid-template-columns: 1fr;
-        gap: 1.5rem;
+    .tech-slider-track {
+        gap: 2rem;
     }
-    
-    .skill-category {
+
+    .tech-item {
+        min-width: 140px;
         padding: 1.5rem;
     }
-    
-    .category-header {
-        margin-bottom: 1.5rem;
+
+    .tech-logo {
+        width: 60px;
+        height: 60px;
+        font-size: 2.5rem;
     }
-    
-    .category-icon {
-        font-size: 2rem;
-        padding: 0.5rem;
+
+    .slider-controls {
+        margin-top: 2rem;
     }
-    
-    .skill-item {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 0.5rem;
+
+    .control-btn {
+        width: 45px;
+        height: 45px;
+        font-size: 1.1rem;
     }
-    
-    .skill-name {
-        min-width: auto;
-        text-align: center;
-    }
-    
-    .skill-percent {
-        text-align: center;
-        min-width: auto;
+
+    .speed-controls {
+        flex-wrap: wrap;
     }
 }
 
 @media (max-width: 480px) {
-    .skill-items {
-        gap: 1rem;
+    .tech-slider-track {
+        gap: 1.5rem;
     }
-    
-    .category-header h3 {
-        font-size: var(--font-size-lg);
+
+    .tech-item {
+        min-width: 120px;
+        padding: 1rem;
+        gap: 0.75rem;
+    }
+
+    .tech-logo {
+        width: 50px;
+        height: 50px;
+        font-size: 2rem;
+    }
+
+    .tech-name {
+        font-size: var(--font-size-sm);
+    }
+
+    .tech-category,
+    .tech-experience {
+        font-size: 0.625rem;
+    }
+
+    .control-btn {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
     }
 }
 
