@@ -1,121 +1,123 @@
-// ===== TETRIS GAME ENGINE =====
+// ===== WORKING TETRIS GAME =====
 
 class TetrisGame {
     constructor() {
         this.canvas = null;
         this.ctx = null;
+        this.isActive = false;
         
-        // Game board (10 wide x 20 tall)
-        this.BOARD_WIDTH = 10;
-        this.BOARD_HEIGHT = 20;
+        // Game settings
+        this.COLS = 10;
+        this.ROWS = 20;
         this.BLOCK_SIZE = 8;
         
+        // Game state
         this.board = [];
-        this.currentPiece = null;
-        this.nextPiece = null;
-        this.holdPiece = null;
-        this.canHold = true;
+        this.score = 0;
+        this.lines = 0;
+        this.level = 1;
+        this.gameOver = false;
+        this.paused = false;
+        this.playing = false;
         
-        this.gameState = {
-            playing: false,
-            paused: false,
-            gameOver: false,
-            score: 0,
-            lines: 0,
-            level: 1,
-            dropTimer: 0,
-            dropInterval: 60, // frames (1 second at 60fps)
-            lockDelay: 0,
-            lockDelayMax: 30
+        // Current piece
+        this.piece = {
+            x: 0,
+            y: 0,
+            shape: [],
+            color: '#00FFFF'
         };
-
-        // Tetris pieces (tetrominoes)
-        this.pieces = {
-            I: {
-                shape: [
-                    [0,0,0,0],
-                    [1,1,1,1],
-                    [0,0,0,0],
-                    [0,0,0,0]
-                ],
-                color: '#00FFFF'
-            },
-            O: {
-                shape: [
-                    [1,1],
-                    [1,1]
-                ],
-                color: '#FFFF00'
-            },
-            T: {
-                shape: [
-                    [0,1,0],
-                    [1,1,1],
-                    [0,0,0]
-                ],
-                color: '#AA00FF'
-            },
-            S: {
-                shape: [
-                    [0,1,1],
-                    [1,1,0],
-                    [0,0,0]
-                ],
-                color: '#00FF00'
-            },
-            Z: {
-                shape: [
-                    [1,1,0],
-                    [0,1,1],
-                    [0,0,0]
-                ],
-                color: '#FF0000'
-            },
-            J: {
-                shape: [
-                    [1,0,0],
-                    [1,1,1],
-                    [0,0,0]
-                ],
-                color: '#0000FF'
-            },
-            L: {
-                shape: [
-                    [0,0,1],
-                    [1,1,1],
-                    [0,0,0]
-                ],
-                color: '#FF7F00'
-            }
-        };
-
-        this.pieceTypes = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
-        this.pieceQueue = [];
         
-        this.animationFrame = null;
-        this.lastUpdateTime = 0;
-        this.isActive = false;
-        this.keys = {};
-        this.keyRepeatTimer = {};
+        // Timing
+        this.dropCounter = 0;
+        this.dropInterval = 1000; // milliseconds
+        this.lastTime = 0;
+        
+        // Tetris pieces
+        this.shapes = [
+            // I piece
+            [
+                [0,0,0,0],
+                [1,1,1,1],
+                [0,0,0,0],
+                [0,0,0,0]
+            ],
+            // O piece  
+            [
+                [1,1],
+                [1,1]
+            ],
+            // T piece
+            [
+                [0,1,0],
+                [1,1,1],
+                [0,0,0]
+            ],
+            // S piece
+            [
+                [0,1,1],
+                [1,1,0],
+                [0,0,0]
+            ],
+            // Z piece
+            [
+                [1,1,0],
+                [0,1,1],
+                [0,0,0]
+            ],
+            // J piece
+            [
+                [1,0,0],
+                [1,1,1],
+                [0,0,0]
+            ],
+            // L piece
+            [
+                [0,0,1],
+                [1,1,1],
+                [0,0,0]
+            ]
+        ];
+        
+        this.colors = [
+            '#00FFFF', // I - Cyan
+            '#FFFF00', // O - Yellow
+            '#AA00FF', // T - Purple
+            '#00FF00', // S - Green
+            '#FF0000', // Z - Red
+            '#0000FF', // J - Blue
+            '#FF7F00'  // L - Orange
+        ];
         
         this.init();
     }
 
     init() {
-        this.setupCanvas();
+        console.log('🎮 Initializing Tetris Game...');
+        
+        if (!this.setupCanvas()) {
+            console.error('❌ Failed to setup canvas');
+            return;
+        }
+        
         this.setupControls();
-        this.resetGame();
-        this.startGameLoop();
-        console.log('🎮 Tetris Game initialized!');
+        this.resetBoard();
+        this.newPiece();
+        this.gameLoop();
+        
+        console.log('✅ Tetris Game initialized successfully!');
     }
 
     setupCanvas() {
         const gameDisplay = document.getElementById('gameDisplay');
-        if (!gameDisplay) return;
+        if (!gameDisplay) {
+            console.error('❌ gameDisplay element not found');
+            return false;
+        }
 
         this.canvas = document.createElement('canvas');
-        this.canvas.width = 240;
-        this.canvas.height = 160;
+        this.canvas.width = 160;
+        this.canvas.height = 120;
         this.canvas.style.cssText = `
             width: 100%;
             height: 100%;
@@ -131,101 +133,79 @@ class TetrisGame {
         gameDisplay.appendChild(this.canvas);
         
         this.isActive = true;
+        return true;
     }
 
     setupControls() {
+        // Remove any existing event listeners
+        document.removeEventListener('keydown', this.handleKeyDown);
+        
         // D-pad controls
         document.querySelectorAll('.d-pad-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.removeEventListener('click', this.handleButtonClick);
+            btn.addEventListener('click', (e) => {
                 this.handleInput(btn.dataset.direction);
             });
         });
 
         // Action buttons
         document.querySelectorAll('.action-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.removeEventListener('click', this.handleButtonClick);
+            btn.addEventListener('click', (e) => {
                 this.handleInput(btn.dataset.action);
             });
         });
 
         // System buttons
         document.querySelectorAll('.system-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.removeEventListener('click', this.handleButtonClick);
+            btn.addEventListener('click', (e) => {
                 this.handleInput(btn.dataset.action);
             });
         });
 
         // Keyboard controls
-        document.addEventListener('keydown', (e) => {
-            this.handleKeyDown(e);
-        });
+        this.handleKeyDown = (e) => {
+            const keyMap = {
+                'ArrowLeft': 'left',
+                'ArrowRight': 'right', 
+                'ArrowDown': 'down',
+                'ArrowUp': 'up',
+                'Space': 'a',
+                'Enter': 'start'
+            };
+            
+            const action = keyMap[e.code];
+            if (action) {
+                e.preventDefault();
+                this.handleInput(action);
+            }
+        };
         
-        document.addEventListener('keyup', (e) => {
-            this.handleKeyUp(e);
-        });
-    }
-
-    handleKeyDown(e) {
-        const keyMap = {
-            'ArrowLeft': 'left',
-            'ArrowRight': 'right',
-            'ArrowDown': 'down',
-            'ArrowUp': 'up',
-            'Space': 'a',
-            'Enter': 'start',
-            'KeyC': 'b',
-            'KeyZ': 'a'
-        };
-
-        const action = keyMap[e.code];
-        if (action) {
-            e.preventDefault();
-            this.keys[action] = true;
-            this.keyRepeatTimer[action] = 0;
-            this.handleInput(action);
-        }
-    }
-
-    handleKeyUp(e) {
-        const keyMap = {
-            'ArrowLeft': 'left',
-            'ArrowRight': 'right',
-            'ArrowDown': 'down',
-            'ArrowUp': 'up',
-            'Space': 'a',
-            'Enter': 'start',
-            'KeyC': 'b',
-            'KeyZ': 'a'
-        };
-
-        const action = keyMap[e.code];
-        if (action) {
-            this.keys[action] = false;
-            this.keyRepeatTimer[action] = 0;
-        }
+        document.addEventListener('keydown', this.handleKeyDown);
     }
 
     handleInput(input) {
-        if (this.gameState.gameOver) {
-            if (input === 'start' || input === 'a') {
-                this.resetGame();
-            }
-            return;
-        }
-
-        if (!this.gameState.playing) {
+        if (!this.playing && !this.gameOver) {
             if (input === 'start' || input === 'a') {
                 this.startGame();
+                return;
             }
-            return;
         }
-
+        
+        if (this.gameOver) {
+            if (input === 'start' || input === 'a') {
+                this.restart();
+                return;
+            }
+        }
+        
         if (input === 'start') {
             this.togglePause();
             return;
         }
-
-        if (this.gameState.paused) return;
+        
+        if (!this.playing || this.paused) return;
 
         switch (input) {
             case 'left':
@@ -235,7 +215,7 @@ class TetrisGame {
                 this.movePiece(1, 0);
                 break;
             case 'down':
-                this.softDrop();
+                this.movePiece(0, 1);
                 break;
             case 'up':
                 this.rotatePiece();
@@ -243,544 +223,325 @@ class TetrisGame {
             case 'a':
                 this.hardDrop();
                 break;
-            case 'b':
-                this.holdCurrentPiece();
-                break;
         }
         
         this.playSound();
     }
 
-    resetGame() {
-        // Initialize empty board
-        this.board = [];
-        for (let y = 0; y < this.BOARD_HEIGHT; y++) {
-            this.board[y] = [];
-            for (let x = 0; x < this.BOARD_WIDTH; x++) {
-                this.board[y][x] = 0;
-            }
-        }
-
-        this.gameState = {
-            playing: false,
-            paused: false,
-            gameOver: false,
-            score: 0,
-            lines: 0,
-            level: 1,
-            dropTimer: 0,
-            dropInterval: 60,
-            lockDelay: 0,
-            lockDelayMax: 30
-        };
-
-        this.currentPiece = null;
-        this.nextPiece = null;
-        this.holdPiece = null;
-        this.canHold = true;
-        this.pieceQueue = [];
-        
-        this.generatePieceQueue();
-        this.spawnNextPiece();
-        this.spawnNextPiece(); // Generate next piece
-    }
-
     startGame() {
-        this.gameState.playing = true;
-        this.gameState.paused = false;
+        this.playing = true;
+        this.paused = false;
+        this.gameOver = false;
+        console.log('🎮 Game started!');
     }
 
     togglePause() {
-        if (this.gameState.playing) {
-            this.gameState.paused = !this.gameState.paused;
+        if (this.playing) {
+            this.paused = !this.paused;
+            console.log(this.paused ? '⏸️ Game paused' : '▶️ Game resumed');
         }
     }
 
-    generatePieceQueue() {
-        // Generate a bag of all piece types (standard Tetris randomization)
-        const bag = [...this.pieceTypes];
-        
-        // Shuffle the bag
-        for (let i = bag.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [bag[i], bag[j]] = [bag[j], bag[i]];
-        }
-        
-        this.pieceQueue.push(...bag);
+    restart() {
+        this.score = 0;
+        this.lines = 0;
+        this.level = 1;
+        this.gameOver = false;
+        this.paused = false;
+        this.playing = false;
+        this.dropInterval = 1000;
+        this.resetBoard();
+        this.newPiece();
+        console.log('🔄 Game restarted');
     }
 
-    spawnNextPiece() {
-        if (this.pieceQueue.length < 7) {
-            this.generatePieceQueue();
+    resetBoard() {
+        this.board = [];
+        for (let r = 0; r < this.ROWS; r++) {
+            this.board[r] = [];
+            for (let c = 0; c < this.COLS; c++) {
+                this.board[r][c] = 0;
+            }
         }
-
-        this.currentPiece = this.nextPiece;
-        this.nextPiece = this.createPiece(this.pieceQueue.shift());
-        this.canHold = true;
-
-        if (this.currentPiece && !this.isValidPosition(this.currentPiece.x, this.currentPiece.y, this.currentPiece.shape)) {
-            this.gameOver();
-        }
-
-        this.gameState.lockDelay = 0;
     }
 
-    createPiece(type) {
-        const piece = {
-            type: type,
-            shape: this.copyMatrix(this.pieces[type].shape),
-            color: this.pieces[type].color,
-            x: Math.floor((this.BOARD_WIDTH - this.pieces[type].shape[0].length) / 2),
-            y: 0
+    newPiece() {
+        const shapeIndex = Math.floor(Math.random() * this.shapes.length);
+        this.piece = {
+            x: Math.floor(this.COLS / 2) - 1,
+            y: 0,
+            shape: this.shapes[shapeIndex],
+            color: this.colors[shapeIndex]
         };
-        return piece;
-    }
-
-    copyMatrix(matrix) {
-        return matrix.map(row => [...row]);
-    }
-
-    update() {
-        if (!this.gameState.playing || this.gameState.paused || this.gameState.gameOver) {
-            return;
-        }
-
-        // Handle continuous key presses
-        this.handleContinuousInput();
-
-        // Update drop timer
-        this.gameState.dropTimer++;
         
-        if (this.gameState.dropTimer >= this.gameState.dropInterval) {
-            this.gameState.dropTimer = 0;
-            
-            if (this.currentPiece) {
-                if (this.isValidPosition(this.currentPiece.x, this.currentPiece.y + 1, this.currentPiece.shape)) {
-                    this.currentPiece.y++;
-                    this.gameState.lockDelay = 0;
-                } else {
-                    this.gameState.lockDelay++;
-                    if (this.gameState.lockDelay >= this.gameState.lockDelayMax) {
-                        this.lockPiece();
-                    }
-                }
-            }
+        // Check game over
+        if (this.collision(0, 0)) {
+            this.gameOver = true;
+            this.playing = false;
+            console.log('💀 Game Over!');
         }
-    }
-
-    handleContinuousInput() {
-        // Handle left/right movement with repeat
-        ['left', 'right', 'down'].forEach(key => {
-            if (this.keys[key]) {
-                this.keyRepeatTimer[key]++;
-                
-                // Initial delay, then repeat every few frames
-                const initialDelay = 10;
-                const repeatRate = 3;
-                
-                if (this.keyRepeatTimer[key] === 1 || 
-                    (this.keyRepeatTimer[key] > initialDelay && this.keyRepeatTimer[key] % repeatRate === 0)) {
-                    
-                    switch (key) {
-                        case 'left':
-                            this.movePiece(-1, 0);
-                            break;
-                        case 'right':
-                            this.movePiece(1, 0);
-                            break;
-                        case 'down':
-                            this.softDrop();
-                            break;
-                    }
-                }
-            }
-        });
     }
 
     movePiece(dx, dy) {
-        if (!this.currentPiece) return false;
-
-        if (this.isValidPosition(this.currentPiece.x + dx, this.currentPiece.y + dy, this.currentPiece.shape)) {
-            this.currentPiece.x += dx;
-            this.currentPiece.y += dy;
-            this.gameState.lockDelay = 0; // Reset lock delay on successful move
+        if (!this.collision(dx, dy)) {
+            this.piece.x += dx;
+            this.piece.y += dy;
             return true;
         }
         return false;
     }
 
     rotatePiece() {
-        if (!this.currentPiece) return;
-
-        const rotated = this.rotateMatrix(this.currentPiece.shape);
+        const rotated = this.rotate(this.piece.shape);
+        const originalShape = this.piece.shape;
+        this.piece.shape = rotated;
         
-        // Try basic rotation
-        if (this.isValidPosition(this.currentPiece.x, this.currentPiece.y, rotated)) {
-            this.currentPiece.shape = rotated;
-            this.gameState.lockDelay = 0;
-            return;
-        }
-
-        // Try wall kicks (SRS - Super Rotation System)
-        const kicks = this.getWallKicks(this.currentPiece.type);
-        for (let kick of kicks) {
-            if (this.isValidPosition(this.currentPiece.x + kick.x, this.currentPiece.y + kick.y, rotated)) {
-                this.currentPiece.x += kick.x;
-                this.currentPiece.y += kick.y;
-                this.currentPiece.shape = rotated;
-                this.gameState.lockDelay = 0;
-                return;
-            }
+        if (this.collision(0, 0)) {
+            this.piece.shape = originalShape; // Revert if collision
         }
     }
 
-    rotateMatrix(matrix) {
-        const size = matrix.length;
+    rotate(shape) {
         const rotated = [];
+        const size = shape.length;
         
         for (let i = 0; i < size; i++) {
             rotated[i] = [];
             for (let j = 0; j < size; j++) {
-                rotated[i][j] = matrix[size - 1 - j][i];
+                rotated[i][j] = shape[size - 1 - j][i];
             }
         }
         
         return rotated;
     }
 
-    getWallKicks(pieceType) {
-        // Basic wall kicks
-        return [
-            { x: -1, y: 0 },
-            { x: 1, y: 0 },
-            { x: 0, y: -1 },
-            { x: -1, y: -1 },
-            { x: 1, y: -1 }
-        ];
-    }
-
-    softDrop() {
-        if (this.movePiece(0, 1)) {
-            this.gameState.score += 1;
-        }
-    }
-
     hardDrop() {
-        if (!this.currentPiece) return;
-
-        let dropDistance = 0;
-        while (this.isValidPosition(this.currentPiece.x, this.currentPiece.y + dropDistance + 1, this.currentPiece.shape)) {
-            dropDistance++;
+        while (this.movePiece(0, 1)) {
+            this.score += 2;
         }
-
-        this.currentPiece.y += dropDistance;
-        this.gameState.score += dropDistance * 2;
         this.lockPiece();
     }
 
-    holdCurrentPiece() {
-        if (!this.currentPiece || !this.canHold) return;
-
-        if (this.holdPiece === null) {
-            this.holdPiece = this.currentPiece.type;
-            this.spawnNextPiece();
-        } else {
-            const temp = this.holdPiece;
-            this.holdPiece = this.currentPiece.type;
-            this.currentPiece = this.createPiece(temp);
-        }
-
-        this.canHold = false;
-    }
-
-    isValidPosition(x, y, shape) {
-        for (let py = 0; py < shape.length; py++) {
-            for (let px = 0; px < shape[py].length; px++) {
-                if (shape[py][px]) {
-                    const nx = x + px;
-                    const ny = y + py;
-
+    collision(dx, dy) {
+        const newX = this.piece.x + dx;
+        const newY = this.piece.y + dy;
+        
+        for (let r = 0; r < this.piece.shape.length; r++) {
+            for (let c = 0; c < this.piece.shape[r].length; c++) {
+                if (this.piece.shape[r][c]) {
+                    const boardX = newX + c;
+                    const boardY = newY + r;
+                    
                     // Check boundaries
-                    if (nx < 0 || nx >= this.BOARD_WIDTH || ny >= this.BOARD_HEIGHT) {
-                        return false;
+                    if (boardX < 0 || boardX >= this.COLS || boardY >= this.ROWS) {
+                        return true;
                     }
-
-                    // Check collision with placed pieces (ignore negative y for spawn)
-                    if (ny >= 0 && this.board[ny][nx]) {
-                        return false;
+                    
+                    // Check collision with existing pieces
+                    if (boardY >= 0 && this.board[boardY][boardX]) {
+                        return true;
                     }
                 }
             }
         }
-        return true;
+        
+        return false;
     }
 
     lockPiece() {
-        if (!this.currentPiece) return;
-
         // Place piece on board
-        for (let py = 0; py < this.currentPiece.shape.length; py++) {
-            for (let px = 0; px < this.currentPiece.shape[py].length; px++) {
-                if (this.currentPiece.shape[py][px]) {
-                    const nx = this.currentPiece.x + px;
-                    const ny = this.currentPiece.y + py;
+        for (let r = 0; r < this.piece.shape.length; r++) {
+            for (let c = 0; c < this.piece.shape[r].length; c++) {
+                if (this.piece.shape[r][c]) {
+                    const boardX = this.piece.x + c;
+                    const boardY = this.piece.y + r;
                     
-                    if (ny >= 0) {
-                        this.board[ny][nx] = this.currentPiece.color;
+                    if (boardY >= 0) {
+                        this.board[boardY][boardX] = this.piece.color;
                     }
                 }
             }
         }
-
-        // Check for line clears
+        
+        // Clear lines
         this.clearLines();
         
-        // Spawn next piece
-        this.spawnNextPiece();
+        // New piece
+        this.newPiece();
     }
 
     clearLines() {
         let linesCleared = 0;
         
-        for (let y = this.BOARD_HEIGHT - 1; y >= 0; y--) {
-            if (this.board[y].every(cell => cell !== 0)) {
-                // Line is full, remove it
-                this.board.splice(y, 1);
-                this.board.unshift(new Array(this.BOARD_WIDTH).fill(0));
+        for (let r = this.ROWS - 1; r >= 0; r--) {
+            if (this.board[r].every(cell => cell !== 0)) {
+                // Remove line
+                this.board.splice(r, 1);
+                // Add empty line at top
+                this.board.unshift(new Array(this.COLS).fill(0));
                 linesCleared++;
-                y++; // Check the same line again
+                r++; // Check same row again
             }
         }
-
+        
         if (linesCleared > 0) {
-            this.gameState.lines += linesCleared;
+            this.lines += linesCleared;
+            this.score += [0, 40, 100, 300, 1200][linesCleared] * (this.level + 1);
+            this.level = Math.floor(this.lines / 10) + 1;
+            this.dropInterval = Math.max(50, 1000 - (this.level - 1) * 50);
             
-            // Score calculation (NES Tetris scoring)
-            const lineScores = [0, 40, 100, 300, 1200];
-            this.gameState.score += lineScores[linesCleared] * (this.gameState.level + 1);
-            
-            // Level progression
-            this.gameState.level = Math.floor(this.gameState.lines / 10) + 1;
-            
-            // Increase drop speed
-            this.gameState.dropInterval = Math.max(1, 60 - (this.gameState.level - 1) * 5);
+            console.log(`🎉 Cleared ${linesCleared} lines! Score: ${this.score}`);
         }
     }
 
-    gameOver() {
-        this.gameState.gameOver = true;
-        this.gameState.playing = false;
+    update(deltaTime) {
+        if (!this.playing || this.paused || this.gameOver) return;
+        
+        this.dropCounter += deltaTime;
+        
+        if (this.dropCounter > this.dropInterval) {
+            if (!this.movePiece(0, 1)) {
+                this.lockPiece();
+            }
+            this.dropCounter = 0;
+        }
     }
 
     render() {
-        if (!this.ctx || !this.isActive) return;
-
+        if (!this.ctx) return;
+        
         // Clear canvas
         this.ctx.fillStyle = '#000';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-        if (!this.gameState.playing && !this.gameState.gameOver) {
+        
+        if (!this.playing && !this.gameOver) {
             this.renderStartScreen();
-        } else if (this.gameState.gameOver) {
+        } else if (this.gameOver) {
             this.renderGameOverScreen();
-        } else if (this.gameState.paused) {
+        } else if (this.paused) {
             this.renderPausedScreen();
         } else {
             this.renderGame();
         }
-
+        
         this.addScanLines();
     }
 
     renderStartScreen() {
-        this.ctx.font = 'bold 16px monospace';
+        this.ctx.font = '12px monospace';
         this.ctx.fillStyle = '#00FFFF';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText('TETRIS', this.canvas.width / 2, 60);
-
-        this.ctx.font = '10px monospace';
-        this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.fillText('Press START to play', this.canvas.width / 2, 90);
-        this.ctx.fillText('↑ Rotate  ↓ Soft Drop', this.canvas.width / 2, 110);
-        this.ctx.fillText('← → Move  A Hard Drop', this.canvas.width / 2, 125);
-        this.ctx.fillText('B Hold Piece', this.canvas.width / 2, 140);
+        this.ctx.fillText('TETRIS', 80, 40);
+        
+        this.ctx.font = '8px monospace';
+        this.ctx.fillStyle = '#FFF';
+        this.ctx.fillText('Press START to play', 80, 60);
+        this.ctx.fillText('← → Move  ↑ Rotate', 80, 75);
+        this.ctx.fillText('↓ Drop  A Hard Drop', 80, 85);
     }
 
     renderGameOverScreen() {
-        this.renderGame(); // Show final board state
+        this.renderGame();
         
-        // Game over overlay
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        // Overlay
+        this.ctx.fillStyle = 'rgba(0,0,0,0.8)';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-        this.ctx.font = 'bold 16px monospace';
+        
+        this.ctx.font = '12px monospace';
         this.ctx.fillStyle = '#FF0000';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText('GAME OVER', this.canvas.width / 2, 70);
-
-        this.ctx.font = '12px monospace';
-        this.ctx.fillStyle = '#FFFFFF';
-        this.ctx.fillText(`Score: ${this.gameState.score}`, this.canvas.width / 2, 95);
-        this.ctx.fillText(`Lines: ${this.gameState.lines}`, this.canvas.width / 2, 110);
-        this.ctx.fillText(`Level: ${this.gameState.level}`, this.canvas.width / 2, 125);
-
-        this.ctx.font = '10px monospace';
-        this.ctx.fillText('Press START to restart', this.canvas.width / 2, 145);
+        this.ctx.fillText('GAME OVER', 80, 45);
+        
+        this.ctx.font = '8px monospace';
+        this.ctx.fillStyle = '#FFF';
+        this.ctx.fillText(`Score: ${this.score}`, 80, 60);
+        this.ctx.fillText(`Lines: ${this.lines}`, 80, 70);
+        this.ctx.fillText('Press START to restart', 80, 85);
     }
 
     renderPausedScreen() {
-        this.renderGame(); // Show game state
+        this.renderGame();
         
-        // Pause overlay
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        this.ctx.fillStyle = 'rgba(0,0,0,0.6)';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-        this.ctx.font = 'bold 14px monospace';
+        
+        this.ctx.font = '12px monospace';
         this.ctx.fillStyle = '#FFFF00';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText('PAUSED', this.canvas.width / 2, 80);
+        this.ctx.fillText('PAUSED', 80, 60);
     }
 
     renderGame() {
-        const offsetX = 10;
-        const offsetY = 5;
-
-        // Draw board background
-        this.ctx.fillStyle = '#111';
-        this.ctx.fillRect(offsetX - 1, offsetY - 1, this.BOARD_WIDTH * this.BLOCK_SIZE + 2, this.BOARD_HEIGHT * this.BLOCK_SIZE + 2);
-
+        const startX = 10;
+        const startY = 5;
+        
+        // Draw board border
+        this.ctx.strokeStyle = '#333';
+        this.ctx.strokeRect(startX - 1, startY - 1, 
+            this.COLS * this.BLOCK_SIZE + 2, 
+            this.ROWS * this.BLOCK_SIZE + 2);
+        
         // Draw placed pieces
-        for (let y = 0; y < this.BOARD_HEIGHT; y++) {
-            for (let x = 0; x < this.BOARD_WIDTH; x++) {
-                if (this.board[y][x]) {
-                    this.drawBlock(offsetX + x * this.BLOCK_SIZE, offsetY + y * this.BLOCK_SIZE, this.board[y][x]);
+        for (let r = 0; r < this.ROWS; r++) {
+            for (let c = 0; c < this.COLS; c++) {
+                if (this.board[r][c]) {
+                    this.drawBlock(
+                        startX + c * this.BLOCK_SIZE,
+                        startY + r * this.BLOCK_SIZE,
+                        this.board[r][c]
+                    );
                 }
             }
         }
-
+        
         // Draw current piece
-        if (this.currentPiece) {
-            this.drawPiece(this.currentPiece, offsetX, offsetY);
+        if (this.piece) {
+            for (let r = 0; r < this.piece.shape.length; r++) {
+                for (let c = 0; c < this.piece.shape[r].length; c++) {
+                    if (this.piece.shape[r][c]) {
+                        this.drawBlock(
+                            startX + (this.piece.x + c) * this.BLOCK_SIZE,
+                            startY + (this.piece.y + r) * this.BLOCK_SIZE,
+                            this.piece.color
+                        );
+                    }
+                }
+            }
         }
-
-        // Draw ghost piece (preview of where piece will land)
-        if (this.currentPiece) {
-            this.drawGhostPiece(this.currentPiece, offsetX, offsetY);
-        }
-
+        
         // Draw UI
         this.renderUI();
-    }
-
-    drawPiece(piece, offsetX, offsetY) {
-        for (let py = 0; py < piece.shape.length; py++) {
-            for (let px = 0; px < piece.shape[py].length; px++) {
-                if (piece.shape[py][px]) {
-                    const x = offsetX + (piece.x + px) * this.BLOCK_SIZE;
-                    const y = offsetY + (piece.y + py) * this.BLOCK_SIZE;
-                    
-                    if (piece.y + py >= 0) { // Don't draw above visible area
-                        this.drawBlock(x, y, piece.color);
-                    }
-                }
-            }
-        }
-    }
-
-    drawGhostPiece(piece, offsetX, offsetY) {
-        let ghostY = piece.y;
-        while (this.isValidPosition(piece.x, ghostY + 1, piece.shape)) {
-            ghostY++;
-        }
-
-        if (ghostY !== piece.y) {
-            for (let py = 0; py < piece.shape.length; py++) {
-                for (let px = 0; px < piece.shape[py].length; px++) {
-                    if (piece.shape[py][px]) {
-                        const x = offsetX + (piece.x + px) * this.BLOCK_SIZE;
-                        const y = offsetY + (ghostY + py) * this.BLOCK_SIZE;
-                        
-                        if (ghostY + py >= 0) {
-                            this.drawGhostBlock(x, y);
-                        }
-                    }
-                }
-            }
-        }
     }
 
     drawBlock(x, y, color) {
         this.ctx.fillStyle = color;
         this.ctx.fillRect(x, y, this.BLOCK_SIZE, this.BLOCK_SIZE);
         
-        // Add highlight
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        this.ctx.fillRect(x, y, this.BLOCK_SIZE - 1, 1);
-        this.ctx.fillRect(x, y, 1, this.BLOCK_SIZE - 1);
-        
-        // Add shadow
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-        this.ctx.fillRect(x + this.BLOCK_SIZE - 1, y, 1, this.BLOCK_SIZE);
-        this.ctx.fillRect(x, y + this.BLOCK_SIZE - 1, this.BLOCK_SIZE, 1);
-    }
-
-    drawGhostBlock(x, y) {
-        this.ctx.strokeStyle = '#666';
+        // Add border
+        this.ctx.strokeStyle = '#FFF';
+        this.ctx.lineWidth = 0.5;
         this.ctx.strokeRect(x, y, this.BLOCK_SIZE, this.BLOCK_SIZE);
     }
 
     renderUI() {
         const uiX = 95;
         
-        // Score
-        this.ctx.font = '8px monospace';
-        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.font = '6px monospace';
+        this.ctx.fillStyle = '#FFF';
         this.ctx.textAlign = 'left';
-        this.ctx.fillText('SCORE', uiX, 15);
-        this.ctx.fillText(this.gameState.score.toString(), uiX, 25);
-
-        // Lines
-        this.ctx.fillText('LINES', uiX, 40);
-        this.ctx.fillText(this.gameState.lines.toString(), uiX, 50);
-
-        // Level
-        this.ctx.fillText('LEVEL', uiX, 65);
-        this.ctx.fillText(this.gameState.level.toString(), uiX, 75);
-
-        // Next piece
-        if (this.nextPiece) {
-            this.ctx.fillText('NEXT', uiX, 90);
-            this.drawMiniPiece(this.nextPiece, uiX, 95);
-        }
-
-        // Hold piece
-        if (this.holdPiece) {
-            this.ctx.fillText('HOLD', uiX, 125);
-            const holdPieceObj = this.createPiece(this.holdPiece);
-            this.drawMiniPiece(holdPieceObj, uiX, 130);
-        }
-    }
-
-    drawMiniPiece(piece, x, y) {
-        const miniBlockSize = 3;
         
-        for (let py = 0; py < piece.shape.length; py++) {
-            for (let px = 0; px < piece.shape[py].length; px++) {
-                if (piece.shape[py][px]) {
-                    this.ctx.fillStyle = piece.color;
-                    this.ctx.fillRect(
-                        x + px * miniBlockSize, 
-                        y + py * miniBlockSize, 
-                        miniBlockSize, 
-                        miniBlockSize
-                    );
-                }
-            }
-        }
+        this.ctx.fillText('SCORE', uiX, 15);
+        this.ctx.fillText(this.score.toString(), uiX, 25);
+        
+        this.ctx.fillText('LINES', uiX, 40);
+        this.ctx.fillText(this.lines.toString(), uiX, 50);
+        
+        this.ctx.fillText('LEVEL', uiX, 65);
+        this.ctx.fillText(this.level.toString(), uiX, 75);
     }
 
     addScanLines() {
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+        this.ctx.fillStyle = 'rgba(0,0,0,0.1)';
         for (let y = 0; y < this.canvas.height; y += 2) {
             this.ctx.fillRect(0, y, this.canvas.width, 1);
         }
@@ -795,50 +556,46 @@ class TetrisGame {
 
         const descEl = document.getElementById('pixelDesc');
         if (descEl) {
-            if (this.gameState.gameOver) {
-                descEl.textContent = `Game Over!\nScore: ${this.gameState.score}\nPress START to restart`;
-            } else if (!this.gameState.playing) {
-                descEl.textContent = 'Welcome to Tetris!\nPress START to begin\nUse D-pad and buttons';
-            } else if (this.gameState.paused) {
-                descEl.textContent = 'Game Paused\nPress START to resume\nScore: ' + this.gameState.score;
+            if (this.gameOver) {
+                descEl.textContent = `Game Over!\nScore: ${this.score}\nLines: ${this.lines}`;
+            } else if (!this.playing) {
+                descEl.textContent = 'Press START to play\nUse D-pad to move\nA = Hard Drop';
+            } else if (this.paused) {
+                descEl.textContent = `Game Paused\nScore: ${this.score}\nPress START to resume`;
             } else {
-                descEl.textContent = `Level: ${this.gameState.level}\nLines: ${this.gameState.lines}\nScore: ${this.gameState.score}`;
+                descEl.textContent = `Level: ${this.level}\nLines: ${this.lines}\nScore: ${this.score}`;
             }
         }
 
         const hpFill = document.getElementById('hpFill');
         if (hpFill) {
-            const progress = Math.min(100, (this.gameState.lines % 10) * 10);
+            const progress = Math.min(100, (this.lines % 10) * 10);
             hpFill.style.width = `${progress}%`;
             hpFill.style.background = 'linear-gradient(90deg, #00FFFF, #0080FF)';
         }
 
         const levelNumber = document.getElementById('levelNumber');
         if (levelNumber) {
-            levelNumber.textContent = this.gameState.level;
+            levelNumber.textContent = this.level;
         }
 
         const gameScore = document.getElementById('gameScore');
         if (gameScore) {
-            gameScore.textContent = this.gameState.score;
+            gameScore.textContent = this.score;
         }
     }
 
-    startGameLoop() {
-        const gameLoop = (currentTime) => {
-            if (currentTime - this.lastUpdateTime >= 16) { // 60 FPS
-                this.update();
-                this.render();
-                this.updateDisplay();
-                this.lastUpdateTime = currentTime;
-            }
-            
-            if (this.isActive) {
-                this.animationFrame = requestAnimationFrame(gameLoop);
-            }
-        };
+    gameLoop(time = 0) {
+        const deltaTime = time - this.lastTime;
+        this.lastTime = time;
         
-        gameLoop(0);
+        this.update(deltaTime);
+        this.render();
+        this.updateDisplay();
+        
+        if (this.isActive) {
+            requestAnimationFrame((time) => this.gameLoop(time));
+        }
     }
 
     playSound() {
@@ -847,136 +604,57 @@ class TetrisGame {
         }
     }
 
-    // Public API methods
+    // Public methods
     pause() {
         this.isActive = false;
-        if (this.animationFrame) {
-            cancelAnimationFrame(this.animationFrame);
-        }
     }
 
     resume() {
         this.isActive = true;
-        this.startGameLoop();
-    }
-
-    getGameState() {
-        return { 
-            ...this.gameState,
-            board: this.board,
-            currentPiece: this.currentPiece,
-            nextPiece: this.nextPiece,
-            holdPiece: this.holdPiece
-        };
+        this.gameLoop();
     }
 }
 
-// ===== ACHIEVEMENT SYSTEM =====
-class AchievementSystem {
+// ===== SIMPLE ACHIEVEMENT SYSTEM =====
+class SimpleAchievementSystem {
     constructor() {
         this.achievements = [
             {
                 id: 'first_game',
-                name: 'First Drop',
-                description: 'Play your first game of Tetris',
-                requirement: { stat: 'gamesStarted', value: 1 },
-                icon: '🎮',
-                unlocked: false
+                name: 'First Game',
+                description: 'Start your first Tetris game',
+                unlocked: false,
+                icon: '🎮'
             },
             {
                 id: 'first_line',
-                name: 'Line Clearer',
+                name: 'Line Clear',
                 description: 'Clear your first line',
-                requirement: { stat: 'linesCleared', value: 1 },
-                icon: '📏',
-                unlocked: false
+                unlocked: false,
+                icon: '📏'
             },
             {
-                id: 'tetris_master',
-                name: 'Tetris!',
-                description: 'Clear 4 lines at once',
-                requirement: { stat: 'tetrises', value: 1 },
-                icon: '💥',
-                unlocked: false
-            },
-            {
-                id: 'score_hunter',
-                name: 'Score Hunter',
-                description: 'Reach 10,000 points',
-                requirement: { stat: 'highScore', value: 10000 },
-                icon: '🏆',
-                unlocked: false
-            },
-            {
-                id: 'level_up',
-                name: 'Speed Demon',
-                description: 'Reach level 5',
-                requirement: { stat: 'maxLevel', value: 5 },
-                icon: '⚡',
-                unlocked: false
-            },
-            {
-                id: 'marathon',
-                name: 'Marathon',
-                description: 'Clear 100 lines',
-                requirement: { stat: 'totalLines', value: 100 },
-                icon: '🏃',
-                unlocked: false
+                id: 'high_score',
+                name: 'High Score',
+                description: 'Score 5000 points',
+                unlocked: false,
+                icon: '🏆'
             }
         ];
         
-        this.stats = {
-            gamesStarted: 0,
-            gamesCompleted: 0,
-            linesCleared: 0,
-            totalLines: 0,
-            tetrises: 0,
-            highScore: 0,
-            maxLevel: 0,
-            piecesPlaced: 0
-        };
-        
-        this.init();
-    }
-
-    init() {
         this.loadProgress();
-        console.log('🏆 Achievement system initialized');
     }
 
-    updateStat(statName, value) {
-        this.stats[statName] = Math.max(this.stats[statName] || 0, value);
-        this.checkAchievements();
-        this.saveProgress();
-    }
-
-    addToStat(statName, value) {
-        this.stats[statName] = (this.stats[statName] || 0) + value;
-        this.checkAchievements();
-        this.saveProgress();
-    }
-
-    checkAchievements() {
-        this.achievements.forEach(achievement => {
-            if (!achievement.unlocked) {
-                const req = achievement.requirement;
-                if (this.stats[req.stat] >= req.value) {
-                    this.unlockAchievement(achievement);
-                }
-            }
-        });
-    }
-
-    unlockAchievement(achievement) {
-        achievement.unlocked = true;
-        this.showAchievementNotification(achievement);
-        
-        if (window.soundManager) {
-            window.soundManager.play('success');
+    checkAchievement(id) {
+        const achievement = this.achievements.find(a => a.id === id);
+        if (achievement && !achievement.unlocked) {
+            achievement.unlocked = true;
+            this.showNotification(achievement);
+            this.saveProgress();
         }
     }
 
-    showAchievementNotification(achievement) {
+    showNotification(achievement) {
         const notification = document.createElement('div');
         notification.innerHTML = `
             <div style="
@@ -987,77 +665,100 @@ class AchievementSystem {
                 color: white;
                 padding: 1rem 2rem;
                 border-radius: 0.5rem;
-                box-shadow: 0 10px 30px var(--shadow-medium);
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
                 z-index: 10000;
                 animation: slideInLeft 0.3s ease;
-                min-width: 280px;
             ">
-                <div style="font-weight: bold; margin-bottom: 0.5rem;">
-                    ${achievement.icon} Achievement Unlocked!
+                <div style="font-weight: bold;">
+                    ${achievement.icon} ${achievement.name}
                 </div>
-                <div style="font-size: 1.1em; margin-bottom: 0.25rem;">
-                    ${achievement.name}
-                </div>
-                <div style="opacity: 0.9; font-size: 0.9em;">
+                <div style="font-size: 0.9em; opacity: 0.9;">
                     ${achievement.description}
                 </div>
             </div>
         `;
 
         document.body.appendChild(notification);
-
-        setTimeout(() => {
-            notification.remove();
-        }, 4000);
+        setTimeout(() => notification.remove(), 3000);
+        
+        if (window.soundManager) {
+            window.soundManager.play('success');
+        }
     }
 
     saveProgress() {
         try {
-            localStorage.setItem('tetris_achievements', JSON.stringify({
-                achievements: this.achievements,
-                stats: this.stats
-            }));
-        } catch (error) {
-            console.warn('Could not save achievement progress');
+            localStorage.setItem('tetris_progress', JSON.stringify(this.achievements));
+        } catch (e) {
+            console.warn('Could not save progress');
         }
     }
 
     loadProgress() {
         try {
-            const saved = localStorage.getItem('tetris_achievements');
+            const saved = localStorage.getItem('tetris_progress');
             if (saved) {
-                const data = JSON.parse(saved);
-                this.achievements = data.achievements || this.achievements;
-                this.stats = data.stats || this.stats;
+                this.achievements = JSON.parse(saved);
             }
-        } catch (error) {
-            console.warn('Could not load achievement progress');
+        } catch (e) {
+            console.warn('Could not load progress');
         }
-    }
-
-    getProgress() {
-        return {
-            achievements: this.achievements,
-            stats: this.stats,
-            completion: Math.round((this.achievements.filter(a => a.unlocked).length / this.achievements.length) * 100)
-        };
     }
 }
 
-// ===== AUTO INITIALIZATION =====
+// ===== INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
-        if (document.getElementById('gameDisplay')) {
-            window.tetrisGame = new TetrisGame();
-            window.achievementSystem = new AchievementSystem();
-            
-            // Track initial game start
-            window.achievementSystem.updateStat('gamesStarted', 1);
+        const gameDisplay = document.getElementById('gameDisplay');
+        if (gameDisplay) {
+            try {
+                window.tetrisGame = new TetrisGame();
+                window.achievementSystem = new SimpleAchievementSystem();
+                
+                // Track first game
+                window.achievementSystem.checkAchievement('first_game');
+                
+                console.log('✅ Tetris game loaded successfully!');
+            } catch (error) {
+                console.error('❌ Failed to initialize Tetris:', error);
+                
+                // Fallback display
+                gameDisplay.innerHTML = `
+                    <div style="
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        height: 100%;
+                        color: white;
+                        font-family: monospace;
+                        font-size: 12px;
+                        text-align: center;
+                    ">
+                        TETRIS<br>
+                        Loading...
+                    </div>
+                `;
+            }
+        } else {
+            console.error('❌ gameDisplay element not found');
         }
-    }, 500);
+    }, 1000);
 });
+
+// Add slideInLeft animation
+if (!document.getElementById('tetris-styles')) {
+    const style = document.createElement('style');
+    style.id = 'tetris-styles';
+    style.textContent = `
+        @keyframes slideInLeft {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+    `;
+    document.head.appendChild(style);
+}
 
 // ===== EXPORT =====
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { TetrisGame, AchievementSystem };
-}s
+    module.exports = { TetrisGame, SimpleAchievementSystem };
+}
