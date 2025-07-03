@@ -1,106 +1,102 @@
-// ===== POKEMON BATTLE GAME ENGINE =====
+// ===== TETRIS GAME ENGINE =====
 
-class PokemonGame {
+class TetrisGame {
     constructor() {
         this.canvas = null;
         this.ctx = null;
+        
+        // Game board (10 wide x 20 tall)
+        this.BOARD_WIDTH = 10;
+        this.BOARD_HEIGHT = 20;
+        this.BLOCK_SIZE = 8;
+        
+        this.board = [];
+        this.currentPiece = null;
+        this.nextPiece = null;
+        this.holdPiece = null;
+        this.canHold = true;
+        
         this.gameState = {
-            currentScreen: 'title', // title, menu, battle, pokemon, inventory, victory, defeat
-            selectedMenuOption: 0,
-            battleState: 'select_action', // select_action, select_move, player_turn, enemy_turn, battle_end
-            selectedAction: 0,
-            selectedMove: 0,
-            animations: [],
-            messages: [],
-            currentMessage: 0,
-            messageTimer: 0,
-            turn: 0
+            playing: false,
+            paused: false,
+            gameOver: false,
+            score: 0,
+            lines: 0,
+            level: 1,
+            dropTimer: 0,
+            dropInterval: 60, // frames (1 second at 60fps)
+            lockDelay: 0,
+            lockDelayMax: 30
         };
 
-        this.player = {
-            name: 'TRAINER',
-            pokemon: [
-                {
-                    name: 'PIKACHU',
-                    type: 'Electric',
-                    level: 25,
-                    hp: 85,
-                    maxHp: 85,
-                    attack: 75,
-                    defense: 60,
-                    speed: 90,
-                    sprite: '⚡',
-                    color: '#FFD700',
-                    moves: [
-                        { name: 'THUNDERBOLT', power: 60, type: 'Electric', pp: 15, maxPp: 15 },
-                        { name: 'QUICK ATTACK', power: 40, type: 'Normal', pp: 20, maxPp: 20 },
-                        { name: 'THUNDER WAVE', power: 0, type: 'Electric', pp: 10, maxPp: 10 },
-                        { name: 'TACKLE', power: 35, type: 'Normal', pp: 25, maxPp: 25 }
-                    ]
-                },
-                {
-                    name: 'CHARIZARD',
-                    type: 'Fire',
-                    level: 30,
-                    hp: 120,
-                    maxHp: 120,
-                    attack: 95,
-                    defense: 80,
-                    speed: 85,
-                    sprite: '🔥',
-                    color: '#FF6B47',
-                    moves: [
-                        { name: 'FLAMETHROWER', power: 70, type: 'Fire', pp: 15, maxPp: 15 },
-                        { name: 'SLASH', power: 55, type: 'Normal', pp: 20, maxPp: 20 },
-                        { name: 'DRAGON RAGE', power: 40, type: 'Dragon', pp: 10, maxPp: 10 },
-                        { name: 'EMBER', power: 40, type: 'Fire', pp: 25, maxPp: 25 }
-                    ]
-                }
-            ],
-            currentPokemon: 0,
-            items: [
-                { name: 'POTION', count: 3, description: 'Heals 20 HP' },
-                { name: 'SUPER POTION', count: 1, description: 'Heals 50 HP' }
-            ]
-        };
-
-        this.enemy = {
-            name: 'WILD',
-            pokemon: {
-                name: 'GYARADOS',
-                type: 'Water',
-                level: 28,
-                hp: 110,
-                maxHp: 110,
-                attack: 90,
-                defense: 75,
-                speed: 70,
-                sprite: '🐉',
-                color: '#4ECDC4',
-                moves: [
-                    { name: 'HYDRO PUMP', power: 80, type: 'Water', pp: 10, maxPp: 10 },
-                    { name: 'BITE', power: 60, type: 'Dark', pp: 20, maxPp: 20 },
-                    { name: 'THRASH', power: 75, type: 'Normal', pp: 15, maxPp: 15 },
-                    { name: 'TACKLE', power: 35, type: 'Normal', pp: 25, maxPp: 25 }
-                ]
+        // Tetris pieces (tetrominoes)
+        this.pieces = {
+            I: {
+                shape: [
+                    [0,0,0,0],
+                    [1,1,1,1],
+                    [0,0,0,0],
+                    [0,0,0,0]
+                ],
+                color: '#00FFFF'
+            },
+            O: {
+                shape: [
+                    [1,1],
+                    [1,1]
+                ],
+                color: '#FFFF00'
+            },
+            T: {
+                shape: [
+                    [0,1,0],
+                    [1,1,1],
+                    [0,0,0]
+                ],
+                color: '#AA00FF'
+            },
+            S: {
+                shape: [
+                    [0,1,1],
+                    [1,1,0],
+                    [0,0,0]
+                ],
+                color: '#00FF00'
+            },
+            Z: {
+                shape: [
+                    [1,1,0],
+                    [0,1,1],
+                    [0,0,0]
+                ],
+                color: '#FF0000'
+            },
+            J: {
+                shape: [
+                    [1,0,0],
+                    [1,1,1],
+                    [0,0,0]
+                ],
+                color: '#0000FF'
+            },
+            L: {
+                shape: [
+                    [0,0,1],
+                    [1,1,1],
+                    [0,0,0]
+                ],
+                color: '#FF7F00'
             }
         };
 
-        this.typeChart = {
-            'Electric': { 'Water': 2, 'Flying': 2, 'Ground': 0, 'Electric': 0.5 },
-            'Fire': { 'Grass': 2, 'Ice': 2, 'Bug': 2, 'Steel': 2, 'Water': 0.5, 'Fire': 0.5, 'Rock': 0.5, 'Dragon': 0.5 },
-            'Water': { 'Fire': 2, 'Ground': 2, 'Rock': 2, 'Water': 0.5, 'Grass': 0.5, 'Dragon': 0.5 },
-            'Normal': {},
-            'Dragon': { 'Dragon': 2 },
-            'Dark': { 'Psychic': 2, 'Ghost': 2 }
-        };
-
-        this.menuOptions = ['FIGHT', 'POKEMON', 'ITEM', 'RUN'];
-        this.battleActions = ['FIGHT', 'POKEMON', 'ITEM', 'RUN'];
+        this.pieceTypes = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
+        this.pieceQueue = [];
         
         this.animationFrame = null;
         this.lastUpdateTime = 0;
         this.isActive = false;
+        this.keys = {};
+        this.keyRepeatTimer = {};
         
         this.init();
     }
@@ -108,9 +104,9 @@ class PokemonGame {
     init() {
         this.setupCanvas();
         this.setupControls();
+        this.resetGame();
         this.startGameLoop();
-        this.addMessage("A wild " + this.enemy.pokemon.name + " appeared!");
-        console.log('🎮 Pokemon Battle Game initialized!');
+        console.log('🎮 Tetris Game initialized!');
     }
 
     setupCanvas() {
@@ -125,7 +121,7 @@ class PokemonGame {
             height: 100%;
             border-radius: 4px;
             image-rendering: pixelated;
-            background: #8fbc8f;
+            background: #000;
         `;
         
         this.ctx = this.canvas.getContext('2d');
@@ -161,671 +157,679 @@ class PokemonGame {
 
         // Keyboard controls
         document.addEventListener('keydown', (e) => {
-            this.handleKeyboard(e);
+            this.handleKeyDown(e);
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            this.handleKeyUp(e);
         });
     }
 
-    handleKeyboard(e) {
+    handleKeyDown(e) {
         const keyMap = {
-            'ArrowUp': 'up',
-            'ArrowDown': 'down',
             'ArrowLeft': 'left',
             'ArrowRight': 'right',
+            'ArrowDown': 'down',
+            'ArrowUp': 'up',
             'Space': 'a',
-            'Enter': 'a',
-            'Shift': 'b',
-            'KeyS': 'start',
-            'KeyA': 'select'
+            'Enter': 'start',
+            'KeyC': 'b',
+            'KeyZ': 'a'
         };
 
         const action = keyMap[e.code];
         if (action) {
             e.preventDefault();
+            this.keys[action] = true;
+            this.keyRepeatTimer[action] = 0;
             this.handleInput(action);
         }
     }
 
+    handleKeyUp(e) {
+        const keyMap = {
+            'ArrowLeft': 'left',
+            'ArrowRight': 'right',
+            'ArrowDown': 'down',
+            'ArrowUp': 'up',
+            'Space': 'a',
+            'Enter': 'start',
+            'KeyC': 'b',
+            'KeyZ': 'a'
+        };
+
+        const action = keyMap[e.code];
+        if (action) {
+            this.keys[action] = false;
+            this.keyRepeatTimer[action] = 0;
+        }
+    }
+
     handleInput(input) {
-        if (this.gameState.messageTimer > 0) {
-            if (input === 'a') {
-                this.nextMessage();
+        if (this.gameState.gameOver) {
+            if (input === 'start' || input === 'a') {
+                this.resetGame();
             }
             return;
         }
 
-        switch (this.gameState.currentScreen) {
-            case 'title':
-                this.handleTitleInput(input);
+        if (!this.gameState.playing) {
+            if (input === 'start' || input === 'a') {
+                this.startGame();
+            }
+            return;
+        }
+
+        if (input === 'start') {
+            this.togglePause();
+            return;
+        }
+
+        if (this.gameState.paused) return;
+
+        switch (input) {
+            case 'left':
+                this.movePiece(-1, 0);
                 break;
-            case 'battle':
-                this.handleBattleInput(input);
+            case 'right':
+                this.movePiece(1, 0);
                 break;
-            case 'pokemon':
-                this.handlePokemonInput(input);
+            case 'down':
+                this.softDrop();
                 break;
-            case 'victory':
-            case 'defeat':
-                this.handleEndInput(input);
+            case 'up':
+                this.rotatePiece();
+                break;
+            case 'a':
+                this.hardDrop();
+                break;
+            case 'b':
+                this.holdCurrentPiece();
                 break;
         }
         
         this.playSound();
-        this.updateDisplay();
     }
 
-    handleTitleInput(input) {
-        if (input === 'a' || input === 'start') {
-            this.gameState.currentScreen = 'battle';
-            this.gameState.battleState = 'select_action';
-        }
-    }
-
-    handleBattleInput(input) {
-        switch (this.gameState.battleState) {
-            case 'select_action':
-                this.handleActionSelection(input);
-                break;
-            case 'select_move':
-                this.handleMoveSelection(input);
-                break;
-            case 'select_pokemon':
-                this.handlePokemonSelection(input);
-                break;
-        }
-    }
-
-    handleActionSelection(input) {
-        switch (input) {
-            case 'up':
-                this.gameState.selectedAction = Math.max(0, this.gameState.selectedAction - 2);
-                break;
-            case 'down':
-                this.gameState.selectedAction = Math.min(3, this.gameState.selectedAction + 2);
-                break;
-            case 'left':
-                if (this.gameState.selectedAction % 2 === 1) {
-                    this.gameState.selectedAction--;
-                }
-                break;
-            case 'right':
-                if (this.gameState.selectedAction % 2 === 0) {
-                    this.gameState.selectedAction++;
-                }
-                break;
-            case 'a':
-                this.selectAction();
-                break;
-            case 'b':
-                // Back to action selection
-                break;
-        }
-    }
-
-    handleMoveSelection(input) {
-        const moves = this.getPlayerPokemon().moves;
-        switch (input) {
-            case 'up':
-                this.gameState.selectedMove = Math.max(0, this.gameState.selectedMove - 2);
-                break;
-            case 'down':
-                this.gameState.selectedMove = Math.min(moves.length - 1, this.gameState.selectedMove + 2);
-                break;
-            case 'left':
-                if (this.gameState.selectedMove % 2 === 1) {
-                    this.gameState.selectedMove--;
-                }
-                break;
-            case 'right':
-                if (this.gameState.selectedMove % 2 === 0 && this.gameState.selectedMove + 1 < moves.length) {
-                    this.gameState.selectedMove++;
-                }
-                break;
-            case 'a':
-                this.selectMove();
-                break;
-            case 'b':
-                this.gameState.battleState = 'select_action';
-                break;
-        }
-    }
-
-    handlePokemonSelection(input) {
-        switch (input) {
-            case 'up':
-                this.player.currentPokemon = Math.max(0, this.player.currentPokemon - 1);
-                break;
-            case 'down':
-                this.player.currentPokemon = Math.min(this.player.pokemon.length - 1, this.player.currentPokemon + 1);
-                break;
-            case 'a':
-                this.switchPokemon();
-                break;
-            case 'b':
-                this.gameState.battleState = 'select_action';
-                this.gameState.currentScreen = 'battle';
-                break;
-        }
-    }
-
-    handlePokemonInput(input) {
-        switch (input) {
-            case 'up':
-                this.player.currentPokemon = Math.max(0, this.player.currentPokemon - 1);
-                break;
-            case 'down':
-                this.player.currentPokemon = Math.min(this.player.pokemon.length - 1, this.player.currentPokemon + 1);
-                break;
-            case 'b':
-                this.gameState.currentScreen = 'battle';
-                break;
-        }
-    }
-
-    handleEndInput(input) {
-        if (input === 'a' || input === 'start') {
-            this.resetGame();
-        }
-    }
-
-    selectAction() {
-        const action = this.battleActions[this.gameState.selectedAction];
-        
-        switch (action) {
-            case 'FIGHT':
-                this.gameState.battleState = 'select_move';
-                this.gameState.selectedMove = 0;
-                break;
-            case 'POKEMON':
-                this.gameState.currentScreen = 'pokemon';
-                this.gameState.battleState = 'select_pokemon';
-                break;
-            case 'ITEM':
-                this.addMessage("No items to use!");
-                break;
-            case 'RUN':
-                this.addMessage("Can't escape!");
-                break;
-        }
-    }
-
-    selectMove() {
-        const playerPokemon = this.getPlayerPokemon();
-        const move = playerPokemon.moves[this.gameState.selectedMove];
-        
-        if (move.pp <= 0) {
-            this.addMessage("No PP left for " + move.name + "!");
-            return;
-        }
-
-        this.executePlayerTurn(move);
-    }
-
-    switchPokemon() {
-        const newPokemon = this.player.pokemon[this.player.currentPokemon];
-        if (newPokemon.hp <= 0) {
-            this.addMessage(newPokemon.name + " is unable to battle!");
-            return;
-        }
-
-        this.addMessage("Come back!");
-        this.addMessage("Go, " + newPokemon.name + "!");
-        this.gameState.battleState = 'select_action';
-        this.gameState.currentScreen = 'battle';
-        this.executeEnemyTurn();
-    }
-
-    executePlayerTurn(move) {
-        const playerPokemon = this.getPlayerPokemon();
-        const enemyPokemon = this.enemy.pokemon;
-        
-        move.pp--;
-        this.addMessage(playerPokemon.name + " used " + move.name + "!");
-        
-        if (move.power > 0) {
-            const damage = this.calculateDamage(playerPokemon, enemyPokemon, move);
-            enemyPokemon.hp = Math.max(0, enemyPokemon.hp - damage);
-            
-            if (damage > 0) {
-                this.addMessage("It dealt " + damage + " damage!");
-                this.createDamageAnimation(enemyPokemon, damage);
+    resetGame() {
+        // Initialize empty board
+        this.board = [];
+        for (let y = 0; y < this.BOARD_HEIGHT; y++) {
+            this.board[y] = [];
+            for (let x = 0; x < this.BOARD_WIDTH; x++) {
+                this.board[y][x] = 0;
             }
         }
 
-        if (enemyPokemon.hp <= 0) {
-            this.addMessage(enemyPokemon.name + " fainted!");
-            this.gameState.currentScreen = 'victory';
-            return;
-        }
+        this.gameState = {
+            playing: false,
+            paused: false,
+            gameOver: false,
+            score: 0,
+            lines: 0,
+            level: 1,
+            dropTimer: 0,
+            dropInterval: 60,
+            lockDelay: 0,
+            lockDelayMax: 30
+        };
 
-        this.executeEnemyTurn();
+        this.currentPiece = null;
+        this.nextPiece = null;
+        this.holdPiece = null;
+        this.canHold = true;
+        this.pieceQueue = [];
+        
+        this.generatePieceQueue();
+        this.spawnNextPiece();
+        this.spawnNextPiece(); // Generate next piece
     }
 
-    executeEnemyTurn() {
-        const enemyPokemon = this.enemy.pokemon;
-        const playerPokemon = this.getPlayerPokemon();
+    startGame() {
+        this.gameState.playing = true;
+        this.gameState.paused = false;
+    }
+
+    togglePause() {
+        if (this.gameState.playing) {
+            this.gameState.paused = !this.gameState.paused;
+        }
+    }
+
+    generatePieceQueue() {
+        // Generate a bag of all piece types (standard Tetris randomization)
+        const bag = [...this.pieceTypes];
         
-        // Simple AI: pick a random move with PP
-        const availableMoves = enemyPokemon.moves.filter(move => move.pp > 0);
-        if (availableMoves.length === 0) {
-            this.addMessage(enemyPokemon.name + " is out of moves!");
+        // Shuffle the bag
+        for (let i = bag.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [bag[i], bag[j]] = [bag[j], bag[i]];
+        }
+        
+        this.pieceQueue.push(...bag);
+    }
+
+    spawnNextPiece() {
+        if (this.pieceQueue.length < 7) {
+            this.generatePieceQueue();
+        }
+
+        this.currentPiece = this.nextPiece;
+        this.nextPiece = this.createPiece(this.pieceQueue.shift());
+        this.canHold = true;
+
+        if (this.currentPiece && !this.isValidPosition(this.currentPiece.x, this.currentPiece.y, this.currentPiece.shape)) {
+            this.gameOver();
+        }
+
+        this.gameState.lockDelay = 0;
+    }
+
+    createPiece(type) {
+        const piece = {
+            type: type,
+            shape: this.copyMatrix(this.pieces[type].shape),
+            color: this.pieces[type].color,
+            x: Math.floor((this.BOARD_WIDTH - this.pieces[type].shape[0].length) / 2),
+            y: 0
+        };
+        return piece;
+    }
+
+    copyMatrix(matrix) {
+        return matrix.map(row => [...row]);
+    }
+
+    update() {
+        if (!this.gameState.playing || this.gameState.paused || this.gameState.gameOver) {
             return;
         }
 
-        const move = availableMoves[Math.floor(Math.random() * availableMoves.length)];
-        move.pp--;
+        // Handle continuous key presses
+        this.handleContinuousInput();
+
+        // Update drop timer
+        this.gameState.dropTimer++;
         
-        this.addMessage(enemyPokemon.name + " used " + move.name + "!");
-        
-        if (move.power > 0) {
-            const damage = this.calculateDamage(enemyPokemon, playerPokemon, move);
-            playerPokemon.hp = Math.max(0, playerPokemon.hp - damage);
+        if (this.gameState.dropTimer >= this.gameState.dropInterval) {
+            this.gameState.dropTimer = 0;
             
-            if (damage > 0) {
-                this.addMessage("It dealt " + damage + " damage!");
-                this.createDamageAnimation(playerPokemon, damage);
+            if (this.currentPiece) {
+                if (this.isValidPosition(this.currentPiece.x, this.currentPiece.y + 1, this.currentPiece.shape)) {
+                    this.currentPiece.y++;
+                    this.gameState.lockDelay = 0;
+                } else {
+                    this.gameState.lockDelay++;
+                    if (this.gameState.lockDelay >= this.gameState.lockDelayMax) {
+                        this.lockPiece();
+                    }
+                }
             }
         }
+    }
 
-        if (playerPokemon.hp <= 0) {
-            this.addMessage(playerPokemon.name + " fainted!");
-            
-            // Check if player has any Pokemon left
-            const alivePokemon = this.player.pokemon.filter(p => p.hp > 0);
-            if (alivePokemon.length === 0) {
-                this.gameState.currentScreen = 'defeat';
-            } else {
-                this.addMessage("Choose next Pokemon!");
-                this.gameState.currentScreen = 'pokemon';
-                this.gameState.battleState = 'select_pokemon';
+    handleContinuousInput() {
+        // Handle left/right movement with repeat
+        ['left', 'right', 'down'].forEach(key => {
+            if (this.keys[key]) {
+                this.keyRepeatTimer[key]++;
+                
+                // Initial delay, then repeat every few frames
+                const initialDelay = 10;
+                const repeatRate = 3;
+                
+                if (this.keyRepeatTimer[key] === 1 || 
+                    (this.keyRepeatTimer[key] > initialDelay && this.keyRepeatTimer[key] % repeatRate === 0)) {
+                    
+                    switch (key) {
+                        case 'left':
+                            this.movePiece(-1, 0);
+                            break;
+                        case 'right':
+                            this.movePiece(1, 0);
+                            break;
+                        case 'down':
+                            this.softDrop();
+                            break;
+                    }
+                }
             }
-            return;
-        }
-
-        this.gameState.battleState = 'select_action';
-    }
-
-    calculateDamage(attacker, defender, move) {
-        let damage = Math.floor(
-            ((2 * attacker.level + 10) / 250) * 
-            (attacker.attack / defender.defense) * 
-            move.power + 2
-        );
-
-        // Type effectiveness
-        const effectiveness = this.getTypeEffectiveness(move.type, defender.type);
-        damage = Math.floor(damage * effectiveness);
-
-        // Random factor (85-100%)
-        damage = Math.floor(damage * (0.85 + Math.random() * 0.15));
-
-        return Math.max(1, damage);
-    }
-
-    getTypeEffectiveness(attackType, defenseType) {
-        if (this.typeChart[attackType] && this.typeChart[attackType][defenseType]) {
-            return this.typeChart[attackType][defenseType];
-        }
-        return 1;
-    }
-
-    createDamageAnimation(pokemon, damage) {
-        this.gameState.animations.push({
-            type: 'damage',
-            target: pokemon,
-            damage: damage,
-            timer: 30
         });
     }
 
-    addMessage(text) {
-        this.gameState.messages.push(text);
-        if (this.gameState.messageTimer === 0) {
-            this.gameState.messageTimer = 120; // 2 seconds at 60fps
+    movePiece(dx, dy) {
+        if (!this.currentPiece) return false;
+
+        if (this.isValidPosition(this.currentPiece.x + dx, this.currentPiece.y + dy, this.currentPiece.shape)) {
+            this.currentPiece.x += dx;
+            this.currentPiece.y += dy;
+            this.gameState.lockDelay = 0; // Reset lock delay on successful move
+            return true;
         }
+        return false;
     }
 
-    nextMessage() {
-        this.gameState.currentMessage++;
-        if (this.gameState.currentMessage >= this.gameState.messages.length) {
-            this.gameState.messages = [];
-            this.gameState.currentMessage = 0;
-            this.gameState.messageTimer = 0;
-        } else {
-            this.gameState.messageTimer = 120;
-        }
-    }
+    rotatePiece() {
+        if (!this.currentPiece) return;
 
-    getPlayerPokemon() {
-        return this.player.pokemon[this.player.currentPokemon];
-    }
-
-    updateDisplay() {
-        const playerPokemon = this.getPlayerPokemon();
+        const rotated = this.rotateMatrix(this.currentPiece.shape);
         
-        // Update HTML elements
-        const titleEl = document.getElementById('pixelTitle');
-        if (titleEl) {
-            titleEl.textContent = playerPokemon.name;
+        // Try basic rotation
+        if (this.isValidPosition(this.currentPiece.x, this.currentPiece.y, rotated)) {
+            this.currentPiece.shape = rotated;
+            this.gameState.lockDelay = 0;
+            return;
         }
 
-        const descEl = document.getElementById('pixelDesc');
-        if (descEl) {
-            if (this.gameState.currentScreen === 'battle') {
-                descEl.textContent = `Battle Mode\nHP: ${playerPokemon.hp}/${playerPokemon.maxHp}\nWhat will you do?`;
-            } else {
-                descEl.textContent = `${playerPokemon.sprite} ${playerPokemon.type} Type\nLevel ${playerPokemon.level}\nHP: ${playerPokemon.hp}/${playerPokemon.maxHp}`;
+        // Try wall kicks (SRS - Super Rotation System)
+        const kicks = this.getWallKicks(this.currentPiece.type);
+        for (let kick of kicks) {
+            if (this.isValidPosition(this.currentPiece.x + kick.x, this.currentPiece.y + kick.y, rotated)) {
+                this.currentPiece.x += kick.x;
+                this.currentPiece.y += kick.y;
+                this.currentPiece.shape = rotated;
+                this.gameState.lockDelay = 0;
+                return;
+            }
+        }
+    }
+
+    rotateMatrix(matrix) {
+        const size = matrix.length;
+        const rotated = [];
+        
+        for (let i = 0; i < size; i++) {
+            rotated[i] = [];
+            for (let j = 0; j < size; j++) {
+                rotated[i][j] = matrix[size - 1 - j][i];
+            }
+        }
+        
+        return rotated;
+    }
+
+    getWallKicks(pieceType) {
+        // Basic wall kicks
+        return [
+            { x: -1, y: 0 },
+            { x: 1, y: 0 },
+            { x: 0, y: -1 },
+            { x: -1, y: -1 },
+            { x: 1, y: -1 }
+        ];
+    }
+
+    softDrop() {
+        if (this.movePiece(0, 1)) {
+            this.gameState.score += 1;
+        }
+    }
+
+    hardDrop() {
+        if (!this.currentPiece) return;
+
+        let dropDistance = 0;
+        while (this.isValidPosition(this.currentPiece.x, this.currentPiece.y + dropDistance + 1, this.currentPiece.shape)) {
+            dropDistance++;
+        }
+
+        this.currentPiece.y += dropDistance;
+        this.gameState.score += dropDistance * 2;
+        this.lockPiece();
+    }
+
+    holdCurrentPiece() {
+        if (!this.currentPiece || !this.canHold) return;
+
+        if (this.holdPiece === null) {
+            this.holdPiece = this.currentPiece.type;
+            this.spawnNextPiece();
+        } else {
+            const temp = this.holdPiece;
+            this.holdPiece = this.currentPiece.type;
+            this.currentPiece = this.createPiece(temp);
+        }
+
+        this.canHold = false;
+    }
+
+    isValidPosition(x, y, shape) {
+        for (let py = 0; py < shape.length; py++) {
+            for (let px = 0; px < shape[py].length; px++) {
+                if (shape[py][px]) {
+                    const nx = x + px;
+                    const ny = y + py;
+
+                    // Check boundaries
+                    if (nx < 0 || nx >= this.BOARD_WIDTH || ny >= this.BOARD_HEIGHT) {
+                        return false;
+                    }
+
+                    // Check collision with placed pieces (ignore negative y for spawn)
+                    if (ny >= 0 && this.board[ny][nx]) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
+    }
+
+    lockPiece() {
+        if (!this.currentPiece) return;
+
+        // Place piece on board
+        for (let py = 0; py < this.currentPiece.shape.length; py++) {
+            for (let px = 0; px < this.currentPiece.shape[py].length; px++) {
+                if (this.currentPiece.shape[py][px]) {
+                    const nx = this.currentPiece.x + px;
+                    const ny = this.currentPiece.y + py;
+                    
+                    if (ny >= 0) {
+                        this.board[ny][nx] = this.currentPiece.color;
+                    }
+                }
             }
         }
 
-        const hpFill = document.getElementById('hpFill');
-        if (hpFill) {
-            const hpPercent = (playerPokemon.hp / playerPokemon.maxHp) * 100;
-            hpFill.style.width = `${hpPercent}%`;
-            hpFill.style.background = hpPercent > 50 ? 'linear-gradient(90deg, #4ade80, #22c55e)' : 'linear-gradient(90deg, #f87171, #ef4444)';
+        // Check for line clears
+        this.clearLines();
+        
+        // Spawn next piece
+        this.spawnNextPiece();
+    }
+
+    clearLines() {
+        let linesCleared = 0;
+        
+        for (let y = this.BOARD_HEIGHT - 1; y >= 0; y--) {
+            if (this.board[y].every(cell => cell !== 0)) {
+                // Line is full, remove it
+                this.board.splice(y, 1);
+                this.board.unshift(new Array(this.BOARD_WIDTH).fill(0));
+                linesCleared++;
+                y++; // Check the same line again
+            }
         }
 
-        const levelNumber = document.getElementById('levelNumber');
-        if (levelNumber) {
-            levelNumber.textContent = playerPokemon.level;
+        if (linesCleared > 0) {
+            this.gameState.lines += linesCleared;
+            
+            // Score calculation (NES Tetris scoring)
+            const lineScores = [0, 40, 100, 300, 1200];
+            this.gameState.score += lineScores[linesCleared] * (this.gameState.level + 1);
+            
+            // Level progression
+            this.gameState.level = Math.floor(this.gameState.lines / 10) + 1;
+            
+            // Increase drop speed
+            this.gameState.dropInterval = Math.max(1, 60 - (this.gameState.level - 1) * 5);
         }
+    }
 
-        const gameScore = document.getElementById('gameScore');
-        if (gameScore) {
-            gameScore.textContent = Math.floor((playerPokemon.maxHp - playerPokemon.hp) + (this.enemy.pokemon.maxHp - this.enemy.pokemon.hp));
-        }
+    gameOver() {
+        this.gameState.gameOver = true;
+        this.gameState.playing = false;
     }
 
     render() {
         if (!this.ctx || !this.isActive) return;
 
         // Clear canvas
-        this.ctx.fillStyle = '#87CEEB';
+        this.ctx.fillStyle = '#000';
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        switch (this.gameState.currentScreen) {
-            case 'title':
-                this.renderTitleScreen();
-                break;
-            case 'battle':
-                this.renderBattleScreen();
-                break;
-            case 'pokemon':
-                this.renderPokemonScreen();
-                break;
-            case 'victory':
-                this.renderVictoryScreen();
-                break;
-            case 'defeat':
-                this.renderDefeatScreen();
-                break;
+        if (!this.gameState.playing && !this.gameState.gameOver) {
+            this.renderStartScreen();
+        } else if (this.gameState.gameOver) {
+            this.renderGameOverScreen();
+        } else if (this.gameState.paused) {
+            this.renderPausedScreen();
+        } else {
+            this.renderGame();
         }
 
-        this.renderAnimations();
-        this.renderMessages();
         this.addScanLines();
     }
 
-    renderTitleScreen() {
-        // Background
-        this.ctx.fillStyle = '#4169E1';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-        // Title
-        this.ctx.font = 'bold 20px monospace';
-        this.ctx.fillStyle = '#FFD700';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText('POKEMON', this.canvas.width / 2, 60);
-        this.ctx.fillText('BATTLE', this.canvas.width / 2, 85);
-
-        // Subtitle
-        this.ctx.font = '12px monospace';
-        this.ctx.fillStyle = 'white';
-        this.ctx.fillText('Press A to start!', this.canvas.width / 2, 120);
-    }
-
-    renderBattleScreen() {
-        // Battlefield background
-        this.ctx.fillStyle = '#90EE90';
-        this.ctx.fillRect(0, 0, this.canvas.width, 100);
-        this.ctx.fillStyle = '#8FBC8F';
-        this.ctx.fillRect(0, 100, this.canvas.width, 60);
-
-        // Enemy Pokemon
-        const enemyPokemon = this.enemy.pokemon;
-        this.ctx.font = '24px serif';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillStyle = enemyPokemon.color;
-        this.ctx.fillText(enemyPokemon.sprite, 180, 50);
-
-        // Enemy Pokemon info
-        this.ctx.font = 'bold 12px monospace';
-        this.ctx.fillStyle = '#2F4F2F';
-        this.ctx.textAlign = 'left';
-        this.ctx.fillText(enemyPokemon.name, 10, 20);
-        this.ctx.fillText(`Lv.${enemyPokemon.level}`, 10, 35);
-
-        // Enemy HP bar
-        this.drawHPBar(10, 40, 80, 6, enemyPokemon.hp, enemyPokemon.maxHp);
-
-        // Player Pokemon
-        const playerPokemon = this.getPlayerPokemon();
-        this.ctx.font = '20px serif';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillStyle = playerPokemon.color;
-        this.ctx.fillText(playerPokemon.sprite, 60, 120);
-
-        // Player Pokemon info
-        this.ctx.font = 'bold 12px monospace';
-        this.ctx.fillStyle = '#2F4F2F';
-        this.ctx.textAlign = 'right';
-        this.ctx.fillText(playerPokemon.name, 230, 120);
-        this.ctx.fillText(`Lv.${playerPokemon.level}`, 230, 135);
-
-        // Player HP bar
-        this.drawHPBar(150, 140, 80, 6, playerPokemon.hp, playerPokemon.maxHp);
-
-        // Battle menu
-        if (this.gameState.battleState === 'select_action') {
-            this.renderBattleMenu();
-        } else if (this.gameState.battleState === 'select_move') {
-            this.renderMoveMenu();
-        }
-    }
-
-    renderBattleMenu() {
-        // Menu background
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        this.ctx.fillRect(120, 80, 120, 80);
-        this.ctx.strokeStyle = 'white';
-        this.ctx.strokeRect(120, 80, 120, 80);
-
-        // Menu options
-        this.ctx.font = '12px monospace';
-        this.ctx.textAlign = 'left';
-        
-        for (let i = 0; i < this.battleActions.length; i++) {
-            const x = 130 + (i % 2) * 50;
-            const y = 100 + Math.floor(i / 2) * 20;
-            
-            if (i === this.gameState.selectedAction) {
-                this.ctx.fillStyle = '#FFD700';
-                this.ctx.fillText('▶', x - 15, y);
-            }
-            
-            this.ctx.fillStyle = 'white';
-            this.ctx.fillText(this.battleActions[i], x, y);
-        }
-    }
-
-    renderMoveMenu() {
-        const playerPokemon = this.getPlayerPokemon();
-        
-        // Menu background
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        this.ctx.fillRect(10, 80, 220, 80);
-        this.ctx.strokeStyle = 'white';
-        this.ctx.strokeRect(10, 80, 220, 80);
-
-        // Moves
-        this.ctx.font = '10px monospace';
-        this.ctx.textAlign = 'left';
-        
-        for (let i = 0; i < playerPokemon.moves.length; i++) {
-            const move = playerPokemon.moves[i];
-            const x = 20 + (i % 2) * 100;
-            const y = 100 + Math.floor(i / 2) * 25;
-            
-            if (i === this.gameState.selectedMove) {
-                this.ctx.fillStyle = '#FFD700';
-                this.ctx.fillText('▶', x - 10, y);
-            }
-            
-            // Move name
-            this.ctx.fillStyle = move.pp > 0 ? 'white' : '#888';
-            this.ctx.fillText(move.name, x, y);
-            
-            // PP
-            this.ctx.fillText(`${move.pp}/${move.maxPp}`, x, y + 12);
-        }
-    }
-
-    renderPokemonScreen() {
-        // Background
-        this.ctx.fillStyle = '#4169E1';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-        // Title
+    renderStartScreen() {
         this.ctx.font = 'bold 16px monospace';
-        this.ctx.fillStyle = 'white';
+        this.ctx.fillStyle = '#00FFFF';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText('CHOOSE POKEMON', this.canvas.width / 2, 25);
+        this.ctx.fillText('TETRIS', this.canvas.width / 2, 60);
 
-        // Pokemon list
-        this.ctx.font = '12px monospace';
-        this.ctx.textAlign = 'left';
+        this.ctx.font = '10px monospace';
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.fillText('Press START to play', this.canvas.width / 2, 90);
+        this.ctx.fillText('↑ Rotate  ↓ Soft Drop', this.canvas.width / 2, 110);
+        this.ctx.fillText('← → Move  A Hard Drop', this.canvas.width / 2, 125);
+        this.ctx.fillText('B Hold Piece', this.canvas.width / 2, 140);
+    }
+
+    renderGameOverScreen() {
+        this.renderGame(); // Show final board state
         
-        for (let i = 0; i < this.player.pokemon.length; i++) {
-            const pokemon = this.player.pokemon[i];
-            const y = 50 + i * 30;
-            
-            if (i === this.player.currentPokemon) {
-                this.ctx.fillStyle = '#FFD700';
-                this.ctx.fillText('▶', 20, y);
+        // Game over overlay
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        this.ctx.font = 'bold 16px monospace';
+        this.ctx.fillStyle = '#FF0000';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('GAME OVER', this.canvas.width / 2, 70);
+
+        this.ctx.font = '12px monospace';
+        this.ctx.fillStyle = '#FFFFFF';
+        this.ctx.fillText(`Score: ${this.gameState.score}`, this.canvas.width / 2, 95);
+        this.ctx.fillText(`Lines: ${this.gameState.lines}`, this.canvas.width / 2, 110);
+        this.ctx.fillText(`Level: ${this.gameState.level}`, this.canvas.width / 2, 125);
+
+        this.ctx.font = '10px monospace';
+        this.ctx.fillText('Press START to restart', this.canvas.width / 2, 145);
+    }
+
+    renderPausedScreen() {
+        this.renderGame(); // Show game state
+        
+        // Pause overlay
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        this.ctx.font = 'bold 14px monospace';
+        this.ctx.fillStyle = '#FFFF00';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('PAUSED', this.canvas.width / 2, 80);
+    }
+
+    renderGame() {
+        const offsetX = 10;
+        const offsetY = 5;
+
+        // Draw board background
+        this.ctx.fillStyle = '#111';
+        this.ctx.fillRect(offsetX - 1, offsetY - 1, this.BOARD_WIDTH * this.BLOCK_SIZE + 2, this.BOARD_HEIGHT * this.BLOCK_SIZE + 2);
+
+        // Draw placed pieces
+        for (let y = 0; y < this.BOARD_HEIGHT; y++) {
+            for (let x = 0; x < this.BOARD_WIDTH; x++) {
+                if (this.board[y][x]) {
+                    this.drawBlock(offsetX + x * this.BLOCK_SIZE, offsetY + y * this.BLOCK_SIZE, this.board[y][x]);
+                }
             }
-            
-            // Pokemon info
-            this.ctx.fillStyle = pokemon.hp > 0 ? 'white' : '#888';
-            this.ctx.fillText(`${pokemon.sprite} ${pokemon.name}`, 35, y);
-            this.ctx.fillText(`Lv.${pokemon.level}`, 35, y + 12);
-            
-            // HP bar
-            if (pokemon.hp > 0) {
-                this.drawHPBar(120, y - 8, 80, 6, pokemon.hp, pokemon.maxHp);
-            } else {
-                this.ctx.fillStyle = '#FF4444';
-                this.ctx.fillText('FAINTED', 120, y);
+        }
+
+        // Draw current piece
+        if (this.currentPiece) {
+            this.drawPiece(this.currentPiece, offsetX, offsetY);
+        }
+
+        // Draw ghost piece (preview of where piece will land)
+        if (this.currentPiece) {
+            this.drawGhostPiece(this.currentPiece, offsetX, offsetY);
+        }
+
+        // Draw UI
+        this.renderUI();
+    }
+
+    drawPiece(piece, offsetX, offsetY) {
+        for (let py = 0; py < piece.shape.length; py++) {
+            for (let px = 0; px < piece.shape[py].length; px++) {
+                if (piece.shape[py][px]) {
+                    const x = offsetX + (piece.x + px) * this.BLOCK_SIZE;
+                    const y = offsetY + (piece.y + py) * this.BLOCK_SIZE;
+                    
+                    if (piece.y + py >= 0) { // Don't draw above visible area
+                        this.drawBlock(x, y, piece.color);
+                    }
+                }
             }
         }
     }
 
-    renderVictoryScreen() {
-        this.ctx.fillStyle = '#FFD700';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    drawGhostPiece(piece, offsetX, offsetY) {
+        let ghostY = piece.y;
+        while (this.isValidPosition(piece.x, ghostY + 1, piece.shape)) {
+            ghostY++;
+        }
 
-        this.ctx.font = 'bold 20px monospace';
-        this.ctx.fillStyle = '#4169E1';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText('VICTORY!', this.canvas.width / 2, 80);
-
-        this.ctx.font = '12px monospace';
-        this.ctx.fillText('You won the battle!', this.canvas.width / 2, 110);
-        this.ctx.fillText('Press A to continue', this.canvas.width / 2, 130);
+        if (ghostY !== piece.y) {
+            for (let py = 0; py < piece.shape.length; py++) {
+                for (let px = 0; px < piece.shape[py].length; px++) {
+                    if (piece.shape[py][px]) {
+                        const x = offsetX + (piece.x + px) * this.BLOCK_SIZE;
+                        const y = offsetY + (ghostY + py) * this.BLOCK_SIZE;
+                        
+                        if (ghostY + py >= 0) {
+                            this.drawGhostBlock(x, y);
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    renderDefeatScreen() {
-        this.ctx.fillStyle = '#8B0000';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
-        this.ctx.font = 'bold 20px monospace';
-        this.ctx.fillStyle = 'white';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText('DEFEAT', this.canvas.width / 2, 80);
-
-        this.ctx.font = '12px monospace';
-        this.ctx.fillText('You lost the battle!', this.canvas.width / 2, 110);
-        this.ctx.fillText('Press A to try again', this.canvas.width / 2, 130);
-    }
-
-    drawHPBar(x, y, width, height, currentHP, maxHP) {
-        // Background
-        this.ctx.fillStyle = '#2F4F2F';
-        this.ctx.fillRect(x, y, width, height);
-        
-        // HP fill
-        const hpPercent = currentHP / maxHP;
-        let color = '#4ade80';
-        if (hpPercent < 0.5) color = '#fbbf24';
-        if (hpPercent < 0.25) color = '#f87171';
-        
+    drawBlock(x, y, color) {
         this.ctx.fillStyle = color;
-        this.ctx.fillRect(x, y, width * hpPercent, height);
+        this.ctx.fillRect(x, y, this.BLOCK_SIZE, this.BLOCK_SIZE);
         
-        // Border
-        this.ctx.strokeStyle = 'black';
-        this.ctx.strokeRect(x, y, width, height);
+        // Add highlight
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+        this.ctx.fillRect(x, y, this.BLOCK_SIZE - 1, 1);
+        this.ctx.fillRect(x, y, 1, this.BLOCK_SIZE - 1);
+        
+        // Add shadow
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        this.ctx.fillRect(x + this.BLOCK_SIZE - 1, y, 1, this.BLOCK_SIZE);
+        this.ctx.fillRect(x, y + this.BLOCK_SIZE - 1, this.BLOCK_SIZE, 1);
     }
 
-    renderAnimations() {
-        this.gameState.animations = this.gameState.animations.filter(anim => {
-            anim.timer--;
-            
-            if (anim.type === 'damage') {
-                this.ctx.font = 'bold 14px monospace';
-                this.ctx.fillStyle = '#FF4444';
-                this.ctx.textAlign = 'center';
-                this.ctx.fillText(`-${anim.damage}`, 120, 80 - (30 - anim.timer));
-            }
-            
-            return anim.timer > 0;
-        });
+    drawGhostBlock(x, y) {
+        this.ctx.strokeStyle = '#666';
+        this.ctx.strokeRect(x, y, this.BLOCK_SIZE, this.BLOCK_SIZE);
     }
 
-    renderMessages() {
-        if (this.gameState.messages.length === 0) return;
-
-        // Message box
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-        this.ctx.fillRect(0, 120, this.canvas.width, 40);
-        this.ctx.strokeStyle = 'white';
-        this.ctx.strokeRect(0, 120, this.canvas.width, 40);
-
-        // Message text
-        this.ctx.font = '12px monospace';
-        this.ctx.fillStyle = 'white';
+    renderUI() {
+        const uiX = 95;
+        
+        // Score
+        this.ctx.font = '8px monospace';
+        this.ctx.fillStyle = '#FFFFFF';
         this.ctx.textAlign = 'left';
-        
-        const currentMsg = this.gameState.messages[this.gameState.currentMessage];
-        this.ctx.fillText(currentMsg, 10, 140);
+        this.ctx.fillText('SCORE', uiX, 15);
+        this.ctx.fillText(this.gameState.score.toString(), uiX, 25);
 
-        // Continue indicator
-        if (this.gameState.messageTimer < 30) {
-            this.ctx.fillText('▼', this.canvas.width - 20, 150);
+        // Lines
+        this.ctx.fillText('LINES', uiX, 40);
+        this.ctx.fillText(this.gameState.lines.toString(), uiX, 50);
+
+        // Level
+        this.ctx.fillText('LEVEL', uiX, 65);
+        this.ctx.fillText(this.gameState.level.toString(), uiX, 75);
+
+        // Next piece
+        if (this.nextPiece) {
+            this.ctx.fillText('NEXT', uiX, 90);
+            this.drawMiniPiece(this.nextPiece, uiX, 95);
         }
 
-        this.gameState.messageTimer--;
+        // Hold piece
+        if (this.holdPiece) {
+            this.ctx.fillText('HOLD', uiX, 125);
+            const holdPieceObj = this.createPiece(this.holdPiece);
+            this.drawMiniPiece(holdPieceObj, uiX, 130);
+        }
+    }
+
+    drawMiniPiece(piece, x, y) {
+        const miniBlockSize = 3;
+        
+        for (let py = 0; py < piece.shape.length; py++) {
+            for (let px = 0; px < piece.shape[py].length; px++) {
+                if (piece.shape[py][px]) {
+                    this.ctx.fillStyle = piece.color;
+                    this.ctx.fillRect(
+                        x + px * miniBlockSize, 
+                        y + py * miniBlockSize, 
+                        miniBlockSize, 
+                        miniBlockSize
+                    );
+                }
+            }
+        }
     }
 
     addScanLines() {
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
         for (let y = 0; y < this.canvas.height; y += 2) {
             this.ctx.fillRect(0, y, this.canvas.width, 1);
+        }
+    }
+
+    updateDisplay() {
+        // Update HTML elements
+        const titleEl = document.getElementById('pixelTitle');
+        if (titleEl) {
+            titleEl.textContent = 'TETRIS';
+        }
+
+        const descEl = document.getElementById('pixelDesc');
+        if (descEl) {
+            if (this.gameState.gameOver) {
+                descEl.textContent = `Game Over!\nScore: ${this.gameState.score}\nPress START to restart`;
+            } else if (!this.gameState.playing) {
+                descEl.textContent = 'Welcome to Tetris!\nPress START to begin\nUse D-pad and buttons';
+            } else if (this.gameState.paused) {
+                descEl.textContent = 'Game Paused\nPress START to resume\nScore: ' + this.gameState.score;
+            } else {
+                descEl.textContent = `Level: ${this.gameState.level}\nLines: ${this.gameState.lines}\nScore: ${this.gameState.score}`;
+            }
+        }
+
+        const hpFill = document.getElementById('hpFill');
+        if (hpFill) {
+            const progress = Math.min(100, (this.gameState.lines % 10) * 10);
+            hpFill.style.width = `${progress}%`;
+            hpFill.style.background = 'linear-gradient(90deg, #00FFFF, #0080FF)';
+        }
+
+        const levelNumber = document.getElementById('levelNumber');
+        if (levelNumber) {
+            levelNumber.textContent = this.gameState.level;
+        }
+
+        const gameScore = document.getElementById('gameScore');
+        if (gameScore) {
+            gameScore.textContent = this.gameState.score;
         }
     }
 
     startGameLoop() {
         const gameLoop = (currentTime) => {
             if (currentTime - this.lastUpdateTime >= 16) { // 60 FPS
+                this.update();
                 this.render();
+                this.updateDisplay();
                 this.lastUpdateTime = currentTime;
             }
             
@@ -835,38 +839,6 @@ class PokemonGame {
         };
         
         gameLoop(0);
-    }
-
-    resetGame() {
-        // Reset Pokemon HP
-        this.player.pokemon.forEach(pokemon => {
-            pokemon.hp = pokemon.maxHp;
-            pokemon.moves.forEach(move => {
-                move.pp = move.maxPp;
-            });
-        });
-
-        this.enemy.pokemon.hp = this.enemy.pokemon.maxHp;
-        this.enemy.pokemon.moves.forEach(move => {
-            move.pp = move.maxPp;
-        });
-
-        // Reset game state
-        this.gameState = {
-            currentScreen: 'title',
-            selectedMenuOption: 0,
-            battleState: 'select_action',
-            selectedAction: 0,
-            selectedMove: 0,
-            animations: [],
-            messages: [],
-            currentMessage: 0,
-            messageTimer: 0,
-            turn: 0
-        };
-
-        this.player.currentPokemon = 0;
-        this.addMessage("A wild " + this.enemy.pokemon.name + " appeared!");
     }
 
     playSound() {
@@ -889,7 +861,13 @@ class PokemonGame {
     }
 
     getGameState() {
-        return { ...this.gameState, player: this.player, enemy: this.enemy };
+        return { 
+            ...this.gameState,
+            board: this.board,
+            currentPiece: this.currentPiece,
+            nextPiece: this.nextPiece,
+            holdPiece: this.holdPiece
+        };
     }
 }
 
@@ -898,47 +876,64 @@ class AchievementSystem {
     constructor() {
         this.achievements = [
             {
-                id: 'first_battle',
-                name: 'First Battle',
-                description: 'Start your first Pokemon battle',
-                requirement: { stat: 'battlesStarted', value: 1 },
-                icon: '⚔️',
+                id: 'first_game',
+                name: 'First Drop',
+                description: 'Play your first game of Tetris',
+                requirement: { stat: 'gamesStarted', value: 1 },
+                icon: '🎮',
                 unlocked: false
             },
             {
-                id: 'first_victory',
-                name: 'Victory!',
-                description: 'Win your first battle',
-                requirement: { stat: 'victories', value: 1 },
+                id: 'first_line',
+                name: 'Line Clearer',
+                description: 'Clear your first line',
+                requirement: { stat: 'linesCleared', value: 1 },
+                icon: '📏',
+                unlocked: false
+            },
+            {
+                id: 'tetris_master',
+                name: 'Tetris!',
+                description: 'Clear 4 lines at once',
+                requirement: { stat: 'tetrises', value: 1 },
+                icon: '💥',
+                unlocked: false
+            },
+            {
+                id: 'score_hunter',
+                name: 'Score Hunter',
+                description: 'Reach 10,000 points',
+                requirement: { stat: 'highScore', value: 10000 },
                 icon: '🏆',
                 unlocked: false
             },
             {
-                id: 'move_master',
-                name: 'Move Master',
-                description: 'Use 20 different moves',
-                requirement: { stat: 'movesUsed', value: 20 },
-                icon: '💫',
+                id: 'level_up',
+                name: 'Speed Demon',
+                description: 'Reach level 5',
+                requirement: { stat: 'maxLevel', value: 5 },
+                icon: '⚡',
                 unlocked: false
             },
             {
-                id: 'pokemon_trainer',
-                name: 'Pokemon Trainer',
-                description: 'Switch Pokemon 5 times',
-                requirement: { stat: 'pokemonSwitched', value: 5 },
-                icon: '🔄',
+                id: 'marathon',
+                name: 'Marathon',
+                description: 'Clear 100 lines',
+                requirement: { stat: 'totalLines', value: 100 },
+                icon: '🏃',
                 unlocked: false
             }
         ];
         
         this.stats = {
-            battlesStarted: 0,
-            victories: 0,
-            defeats: 0,
-            movesUsed: 0,
-            pokemonSwitched: 0,
-            damageDealt: 0,
-            damageTaken: 0
+            gamesStarted: 0,
+            gamesCompleted: 0,
+            linesCleared: 0,
+            totalLines: 0,
+            tetrises: 0,
+            highScore: 0,
+            maxLevel: 0,
+            piecesPlaced: 0
         };
         
         this.init();
@@ -950,6 +945,12 @@ class AchievementSystem {
     }
 
     updateStat(statName, value) {
+        this.stats[statName] = Math.max(this.stats[statName] || 0, value);
+        this.checkAchievements();
+        this.saveProgress();
+    }
+
+    addToStat(statName, value) {
         this.stats[statName] = (this.stats[statName] || 0) + value;
         this.checkAchievements();
         this.saveProgress();
@@ -982,7 +983,7 @@ class AchievementSystem {
                 position: fixed;
                 top: 2rem;
                 left: 2rem;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                background: linear-gradient(135deg, #00FFFF 0%, #0080FF 100%);
                 color: white;
                 padding: 1rem 2rem;
                 border-radius: 0.5rem;
@@ -1012,7 +1013,7 @@ class AchievementSystem {
 
     saveProgress() {
         try {
-            localStorage.setItem('pokemon_achievements', JSON.stringify({
+            localStorage.setItem('tetris_achievements', JSON.stringify({
                 achievements: this.achievements,
                 stats: this.stats
             }));
@@ -1023,7 +1024,7 @@ class AchievementSystem {
 
     loadProgress() {
         try {
-            const saved = localStorage.getItem('pokemon_achievements');
+            const saved = localStorage.getItem('tetris_achievements');
             if (saved) {
                 const data = JSON.parse(saved);
                 this.achievements = data.achievements || this.achievements;
@@ -1047,16 +1048,16 @@ class AchievementSystem {
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         if (document.getElementById('gameDisplay')) {
-            window.pokemonGame = new PokemonGame();
+            window.tetrisGame = new TetrisGame();
             window.achievementSystem = new AchievementSystem();
             
-            // Track achievements
-            window.achievementSystem.updateStat('battlesStarted', 1);
+            // Track initial game start
+            window.achievementSystem.updateStat('gamesStarted', 1);
         }
     }, 500);
 });
 
 // ===== EXPORT =====
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { PokemonGame, AchievementSystem };
-}
+    module.exports = { TetrisGame, AchievementSystem };
+}s
