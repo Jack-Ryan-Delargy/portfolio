@@ -1,4 +1,4 @@
-// ===== SIMPLIFIED PORTFOLIO SCRIPT =====
+// ===== SIMPLIFIED PORTFOLIO SCRIPT WITH FIXES =====
 
 // ===== LOADING SCREEN =====
 class LoadingScreen {
@@ -250,6 +250,9 @@ class ContactForm {
             await new Promise(resolve => setTimeout(resolve, 2000));
             this.showSuccess();
             this.form.reset();
+            
+            // Dispatch custom event for achievements
+            document.dispatchEvent(new CustomEvent('formSubmitted', { detail: data }));
         } catch (error) {
             this.showError();
         } finally {
@@ -360,7 +363,6 @@ class ScrollAnimations {
 
     init() {
         this.setupScrollObserver();
-        this.setupSkillBars();
         this.setupNavbarScroll();
     }
 
@@ -369,10 +371,6 @@ class ScrollAnimations {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
                     entry.target.classList.add('revealed');
-                    
-                    if (entry.target.classList.contains('skills')) {
-                        setTimeout(() => this.animateSkillBars(), 500);
-                    }
                 }
             });
         }, this.observerOptions);
@@ -382,32 +380,9 @@ class ScrollAnimations {
         });
     }
 
-    setupSkillBars() {
-        const skillItems = document.querySelectorAll('.skill-item');
-        skillItems.forEach(item => {
-            const level = item.dataset.level;
-            const progressBar = item.querySelector('.skill-progress');
-            if (progressBar) {
-                progressBar.dataset.width = `${level}%`;
-            }
-        });
-    }
-
-    animateSkillBars() {
-        const skillItems = document.querySelectorAll('.skill-item');
-        skillItems.forEach((item, index) => {
-            const progressBar = item.querySelector('.skill-progress');
-            if (progressBar) {
-                setTimeout(() => {
-                    const width = progressBar.dataset.width;
-                    progressBar.style.width = width;
-                }, index * 100);
-            }
-        });
-    }
-
     setupNavbarScroll() {
         const navbar = document.getElementById('navbar');
+        if (!navbar) return;
 
         window.addEventListener('scroll', () => {
             if (window.scrollY > 50) {
@@ -437,6 +412,11 @@ class SmoothScrolling {
                         behavior: 'smooth',
                         block: 'start'
                     });
+                    
+                    // Close mobile menu if open
+                    if (window.mobileMenu) {
+                        window.mobileMenu.close();
+                    }
                 }
             });
         });
@@ -447,105 +427,311 @@ class SmoothScrolling {
 class SoundManager {
     constructor() {
         this.enabled = true;
+        this.audioContext = null;
         this.init();
     }
 
     init() {
+        // Initialize audio context on first user interaction
+        document.addEventListener('click', this.initAudioContext.bind(this), { once: true });
+        document.addEventListener('touchstart', this.initAudioContext.bind(this), { once: true });
+        
         document.addEventListener('click', (e) => {
-            if (e.target.matches('button, .btn')) {
+            if (e.target.matches('button, .btn, a[href]')) {
                 this.playClick();
+            }
+        });
+
+        document.addEventListener('mouseover', (e) => {
+            if (e.target.matches('button, .btn, a[href]')) {
+                this.playHover();
             }
         });
     }
 
+    initAudioContext() {
+        if (!this.audioContext) {
+            try {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (error) {
+                console.warn('Audio context not supported');
+            }
+        }
+    }
+
     playClick() {
+        if (!this.enabled || !this.audioContext) return;
+        this.createBeep(800, 0.1, 0.1);
+    }
+
+    playHover() {
+        if (!this.enabled || !this.audioContext) return;
+        this.createBeep(600, 0.05, 0.05);
+    }
+
+    play(soundName) {
         if (!this.enabled) return;
         
-        // Simple click sound using Web Audio API
+        switch (soundName) {
+            case 'click':
+                this.playClick();
+                break;
+            case 'hover':
+                this.playHover();
+                break;
+            case 'success':
+                this.playSuccess();
+                break;
+        }
+    }
+
+    playSuccess() {
+        if (!this.enabled || !this.audioContext) return;
+        
+        const frequencies = [523.25, 659.25, 783.99]; // C, E, G
+        frequencies.forEach((freq, index) => {
+            setTimeout(() => {
+                this.createBeep(freq, 0.3, 0.1);
+            }, index * 100);
+        });
+    }
+
+    createBeep(frequency, duration, volume = 0.1) {
+        if (!this.audioContext) return;
+        
         try {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
+            const oscillator = this.audioContext.createOscillator();
+            const gainNode = this.audioContext.createGain();
             
             oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
+            gainNode.connect(this.audioContext.destination);
             
-            oscillator.frequency.value = 800;
+            oscillator.frequency.value = frequency;
             oscillator.type = 'sine';
             
-            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-            gainNode.gain.linearRampToValueAtTime(0.1, audioContext.currentTime + 0.01);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.1);
+            gainNode.gain.setValueAtTime(0, this.audioContext.currentTime);
+            gainNode.gain.linearRampToValueAtTime(volume, this.audioContext.currentTime + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + duration);
             
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.1);
+            oscillator.start(this.audioContext.currentTime);
+            oscillator.stop(this.audioContext.currentTime + duration);
         } catch (error) {
             // Audio not supported, silent fail
         }
     }
 
-    play(soundName) {
-        if (soundName === 'click') {
-            this.playClick();
-        }
+    toggle() {
+        this.enabled = !this.enabled;
+        console.log(`🔊 Sound ${this.enabled ? 'enabled' : 'disabled'}`);
     }
 }
 
-// ===== MOBILE MENU =====
+// ===== ENHANCED MOBILE MENU =====
 class MobileMenu {
     constructor() {
         this.menuToggle = document.getElementById('mobileMenuToggle');
         this.navLinks = document.getElementById('navLinks');
         this.isOpen = false;
+        this.isAnimating = false;
         
         this.init();
     }
 
     init() {
         if (this.menuToggle) {
-            this.menuToggle.addEventListener('click', () => {
+            this.menuToggle.addEventListener('click', (e) => {
+                e.stopPropagation();
                 this.toggle();
             });
         }
 
+        // Close menu when clicking nav links
         if (this.navLinks) {
             this.navLinks.addEventListener('click', (e) => {
-                if (e.target.tagName === 'A') {
+                if (e.target.tagName === 'A' && e.target.getAttribute('href').startsWith('#')) {
                     this.close();
                 }
             });
         }
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (this.isOpen && !this.navLinks.contains(e.target) && !this.menuToggle.contains(e.target)) {
+                this.close();
+            }
+        });
+
+        // Close menu on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.isOpen) {
+                this.close();
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 768 && this.isOpen) {
+                this.close();
+            }
+        });
     }
 
     toggle() {
+        if (this.isAnimating) return;
+        
         this.isOpen ? this.close() : this.open();
     }
 
     open() {
+        if (this.isAnimating) return;
+        
+        this.isAnimating = true;
         this.isOpen = true;
+        
         this.navLinks.classList.add('active');
         this.menuToggle.classList.add('active');
         document.body.style.overflow = 'hidden';
+        
+        // Play sound effect
+        if (window.soundManager) {
+            window.soundManager.play('click');
+        }
+        
+        // Reset animation flag after transition
+        setTimeout(() => {
+            this.isAnimating = false;
+        }, 400);
     }
 
     close() {
+        if (this.isAnimating) return;
+        
+        this.isAnimating = true;
         this.isOpen = false;
+        
         this.navLinks.classList.remove('active');
         this.menuToggle.classList.remove('active');
         document.body.style.overflow = '';
+        
+        // Play sound effect
+        if (window.soundManager) {
+            window.soundManager.play('click');
+        }
+        
+        // Reset animation flag after transition
+        setTimeout(() => {
+            this.isAnimating = false;
+        }, 400);
+    }
+}
+
+// ===== PARTICLE SYSTEM =====
+class ParticleSystem {
+    constructor() {
+        this.particles = [];
+        this.particleContainer = document.getElementById('particles');
+        this.maxParticles = 50;
+        this.init();
+    }
+
+    init() {
+        if (!this.particleContainer) return;
+        
+        this.createParticles();
+        this.animateParticles();
+    }
+
+    createParticles() {
+        for (let i = 0; i < this.maxParticles; i++) {
+            setTimeout(() => {
+                this.createParticle();
+            }, i * 200);
+        }
+    }
+
+    createParticle() {
+        if (!this.particleContainer) return;
+        
+        const particle = document.createElement('div');
+        particle.className = 'particle';
+        
+        // Random starting position
+        particle.style.left = Math.random() * 100 + '%';
+        particle.style.animationDelay = Math.random() * 20 + 's';
+        particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+        
+        this.particleContainer.appendChild(particle);
+        
+        // Remove particle after animation
+        particle.addEventListener('animationend', () => {
+            if (particle.parentNode) {
+                particle.remove();
+            }
+            // Create new particle to maintain count
+            setTimeout(() => this.createParticle(), Math.random() * 5000);
+        });
+    }
+
+    animateParticles() {
+        // Additional particle animations can be added here
+    }
+}
+
+// ===== ERROR HANDLER =====
+class ErrorHandler {
+    constructor() {
+        this.init();
+    }
+
+    init() {
+        // Global error handling
+        window.addEventListener('error', (e) => {
+            console.warn('Handled error:', e.error?.message || e.message);
+            // Don't show errors to users, just log them
+        });
+
+        // Promise rejection handling
+        window.addEventListener('unhandledrejection', (e) => {
+            console.warn('Handled promise rejection:', e.reason);
+            e.preventDefault();
+        });
+
+        // Image error handling
+        document.addEventListener('error', (e) => {
+            if (e.target.tagName === 'IMG') {
+                this.handleImageError(e.target);
+            }
+        }, true);
+    }
+
+    handleImageError(img) {
+        if (!img.dataset.fallbackHandled) {
+            img.dataset.fallbackHandled = 'true';
+            img.style.display = 'none';
+            
+            // Try to show fallback element
+            const fallback = img.nextElementSibling;
+            if (fallback && fallback.classList.contains('emoji-fallback')) {
+                fallback.style.display = 'block';
+            }
+        }
     }
 }
 
 // ===== MAIN APP INITIALIZATION =====
 document.addEventListener('DOMContentLoaded', () => {
+    // Initialize error handler first
+    new ErrorHandler();
+    
     // Initialize all components
     new LoadingScreen();
-    new ThemeManager();
-    new ProjectManager();
-    new ContactForm();
-    new ScrollAnimations();
-    new SmoothScrolling();
-    new MobileMenu();
+    window.themeManager = new ThemeManager();
+    window.projectManager = new ProjectManager();
+    window.contactForm = new ContactForm();
+    window.scrollAnimations = new ScrollAnimations();
+    window.smoothScrolling = new SmoothScrolling();
+    window.mobileMenu = new MobileMenu();
+    window.particleSystem = new ParticleSystem();
     
     // Initialize sound manager
     window.soundManager = new SoundManager();
@@ -561,18 +747,54 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const typewriterElement = document.getElementById('heroTypewriter');
     if (typewriterElement) {
-        new TypewriterEffect(typewriterElement, typewriterTexts);
+        window.typewriterEffect = new TypewriterEffect(typewriterElement, typewriterTexts);
     }
     
-    console.log('🎮 Simple portfolio loaded successfully!');
+    // Add performance monitoring
+    if ('performance' in window) {
+        window.addEventListener('load', () => {
+            const loadTime = performance.timing.loadEventEnd - performance.timing.navigationStart;
+            console.log(`⚡ Page loaded in ${loadTime}ms`);
+        });
+    }
+    
+    console.log('🎮 Enhanced portfolio loaded successfully!');
 });
 
-// Add basic CSS animations
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideInRight {
-        from { transform: translateX(100%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-    }
-`;
-document.head.appendChild(style);
+// Add basic CSS animations if not already present
+if (!document.querySelector('#dynamic-styles')) {
+    const style = document.createElement('style');
+    style.id = 'dynamic-styles';
+    style.textContent = `
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        /* Improved focus styles */
+        *:focus-visible {
+            outline: 2px solid var(--text-accent);
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+        
+        /* Smooth transitions for theme switching */
+        * {
+            transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+        }
+    `;
+    document.head.appendChild(style);
+}
+
+// Export for debugging
+window.PortfolioApp = {
+    themeManager: () => window.themeManager,
+    mobileMenu: () => window.mobileMenu,
+    soundManager: () => window.soundManager,
+    projectManager: () => window.projectManager
+};
